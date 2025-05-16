@@ -1,5 +1,5 @@
 from flask import (Blueprint, send_from_directory, abort, current_app, send_file, 
-                   after_this_request, request, flash, redirect, url_for)
+                   after_this_request, request, flash, redirect, url_for, jsonify)
 import os
 import shutil
 import tempfile
@@ -100,51 +100,36 @@ def upload_files(destination_folder_segment):
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     
     actual_fs_relative_path = '' if destination_folder_segment == '__root__' else destination_folder_segment
-    redirect_subpath_on_return = actual_fs_relative_path
-
     if not is_safe_path(FILE_SYSTEM_ROOT, actual_fs_relative_path):
-        flash("Error: The destination route to upload is invalid or not allowed.", "danger")
-        return redirect(url_for('browse.browse_directory')) 
+        return jsonify({"success": False, "message": "Error: The destination route for the upload is invalid or not allowed."}), 400
 
     target_upload_path_abs = os.path.join(FILE_SYSTEM_ROOT, actual_fs_relative_path)
     if not os.path.isdir(target_upload_path_abs):
-        flash(f"Error: The target directory for uploading '{actual_fs_relative_path if actual_fs_relative_path else 'Root'}' does not exist.", "danger")
-        return redirect(url_for('browse.browse_directory', subpath=redirect_subpath_on_return))
+        return jsonify({"success": False, "message": f"Error: The target directory for the upload '{actual_fs_relative_path if actual_fs_relative_path else 'Root'}' does not exist."}), 400
 
     if 'files_to_upload' not in request.files:
-        flash('No files were selected for upload.', 'warning')
-        return redirect(url_for('browse.browse_directory', subpath=redirect_subpath_on_return))
+        return jsonify({"success": False, "message": "No files were selected for upload."}), 400
 
-    files = request.files.getlist('files_to_upload')
-    if not files or all(not f.filename for f in files):
-        flash('No valid file was selected for upload.', 'warning')
-        return redirect(url_for('browse.browse_directory', subpath=redirect_subpath_on_return))
+    file_storage = request.files.get('files_to_upload') 
 
-    files_uploaded_count = 0
-    for file_storage in files:
-        if not file_storage or not file_storage.filename:
-            continue
+    if not file_storage or not file_storage.filename:
+        return jsonify({"success": False, "message": "A valid file was not selected for upload."}), 400
             
-        filename = secure_filename(file_storage.filename)
-        if not filename:
-            flash(f"The original filename '{file_storage.filename}' is invalid and was omitted.", "warning")
-            continue
+    filename_original = file_storage.filename
+    filename_secured = secure_filename(file_storage.filename)
 
-        destination_file_path = os.path.join(target_upload_path_abs, filename)
-        
-        if os.path.exists(destination_file_path):
-            flash(f"The file '{filename}' already exists in the destination. It was not uploaded.", "warning")
-            continue
-        try:
-            file_storage.save(destination_file_path)
-            files_uploaded_count += 1
-        except Exception as e:
-            current_app.logger.error(f"Error saving file '{filename}': {e}")
-            flash(f"Error saving the file '{filename}'.", "danger")
+    if not filename_secured:
+        return jsonify({"success": False, "filename": filename_original, "message": f"The original filename '{filename_original}' is invalid and was omitted."}), 400
+
+    destination_file_path = os.path.join(target_upload_path_abs, filename_secured)
     
-    if files_uploaded_count > 0:
-        flash(f"{files_uploaded_count} file(s) uploaded successfully.", "success")
-    elif not files:
-        flash('No files were selected for upload.', 'warning')
-        
-    return redirect(url_for('browse.browse_directory', subpath=redirect_subpath_on_return))
+    if os.path.exists(destination_file_path):
+        return jsonify({"success": False, "filename": filename_secured, "message": f"The file '{filename_secured}' already exists in the destination. It was not uploaded."}), 409 # 409 Conflict
+    
+    try:
+        file_storage.save(destination_file_path)
+        return jsonify({"success": True, "filename": filename_secured, "message": "File uploaded successfully."}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error saving file '{filename_secured}': {e}")
+        return jsonify({"success": False, "filename": filename_secured, "message": f"Error saving the file '{filename_secured}'."}), 500
+    
