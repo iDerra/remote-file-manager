@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
             function uploadFile(index) {
                 if (index >= totalFiles) {
                     uploadStatusText.textContent = 'All files processed.';
-                    setTimeout(() => { window.location.reload(); }, 2000);
+                    setTimeout(() => { window.location.reload(); }, 1000);
                     return;
                 }
 

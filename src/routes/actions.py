@@ -1,8 +1,9 @@
-from flask import Blueprint, request, flash, redirect, url_for, current_app, abort
+from flask import Blueprint, request, flash, redirect, url_for, current_app, abort, jsonify
 import os
 import shutil
 from werkzeug.utils import secure_filename
 from utils.utilsHandler import is_safe_path
+from urllib.parse import unquote
 
 actions_bp = Blueprint('actions', __name__)
 
@@ -130,3 +131,77 @@ def move_item(item_to_move_segment):
         flash(f"Error when moving '{os.path.basename(item_to_move_segment)}': {str(e)}", "danger")
 
     return redirect(url_for('browse.browse_directory', subpath=current_item_parent_dir))
+
+@actions_bp.route('/delete_multiple_items', methods=['POST'])
+def delete_multiple_items():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    data = request.get_json()
+
+    if not data or 'items_to_delete' not in data:
+        return jsonify({"success": False, "message": "No items were specified for removal.", "details": []}), 400
+
+    items_to_delete_segments_quoted = data['items_to_delete']
+
+    if not isinstance(items_to_delete_segments_quoted, list):
+        return jsonify({"success": False, "message": "Invalid format for the elements to be deleted.", "details": []}), 400
+
+    results_details = []
+    overall_success = True
+    any_successful_deletions = False
+
+    for item_segment_quoted in items_to_delete_segments_quoted:
+        item_segment_unquoted = unquote(item_segment_quoted)
+        item_name_display = os.path.basename(item_segment_unquoted) if item_segment_unquoted else item_segment_unquoted
+
+
+        if item_segment_unquoted == '__root__' or not item_segment_unquoted:
+            results_details.append({"item_name": "Root", "item_path": item_segment_unquoted, "success": False, "message": "The root directory cannot be deleted."})
+            overall_success = False
+            continue
+
+        if not is_safe_path(FILE_SYSTEM_ROOT, item_segment_unquoted):
+            results_details.append({"item_name": item_name_display, "item_path": item_segment_unquoted, "success": False, "message": "Invalid or not allowed route."})
+            overall_success = False
+            continue
+
+        item_path_abs = os.path.join(FILE_SYSTEM_ROOT, item_segment_unquoted)
+
+        if not os.path.exists(item_path_abs):
+            results_details.append({"item_name": item_name_display, "item_path": item_segment_unquoted, "success": False, "message": "Item not found (could have been deleted previously)." })
+            overall_success = False 
+            continue
+
+        try:
+            if os.path.isfile(item_path_abs):
+                os.remove(item_path_abs)
+                results_details.append({"item_name": item_name_display, "item_path": item_segment_unquoted, "success": True, "message": "File successfully deleted."})
+                any_successful_deletions = True
+            elif os.path.isdir(item_path_abs):
+                shutil.rmtree(item_path_abs) 
+                results_details.append({"item_name": item_name_display, "item_path": item_segment_unquoted, "success": True, "message": "Folder successfully deleted."})
+                any_successful_deletions = True
+            else:
+                results_details.append({"item_name": item_name_display, "item_path": item_segment_unquoted, "success": False, "message": "The item is not a valid file or folder."})
+                overall_success = False
+        except Exception as e:
+            current_app.logger.error(f"Error eliminando '{item_path_abs}': {e}")
+            results_details.append({"item_name": item_name_display, "item_path": item_segment_unquoted, "success": False, "message": f"Error when deleting: {str(e)}"})
+            overall_success = False
+    
+    final_message = "Multiple elimination operation completed."
+    if any_successful_deletions and not overall_success:
+        final_message = "Some elements were removed, but errors occurred with others."
+    elif not any_successful_deletions and not overall_success:
+         final_message = "None of the selected items could not be deleted due to errors or because they were not found."
+    elif any_successful_deletions and overall_success:
+         final_message = "All selected items were successfully removed."
+
+
+    if any_successful_deletions:
+        flash(final_message, "success" if overall_success else "warning")
+
+    return jsonify({
+        "overall_success": overall_success and any_successful_deletions, 
+        "message": final_message,
+        "details": results_details
+    }), 200

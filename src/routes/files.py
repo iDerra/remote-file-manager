@@ -124,7 +124,7 @@ def upload_files(destination_folder_segment):
     destination_file_path = os.path.join(target_upload_path_abs, filename_secured)
     
     if os.path.exists(destination_file_path):
-        return jsonify({"success": False, "filename": filename_secured, "message": f"The file '{filename_secured}' already exists in the destination. It was not uploaded."}), 409 # 409 Conflict
+        return jsonify({"success": False, "filename": filename_secured, "message": f"The file '{filename_secured}' already exists in the destination. It was not uploaded."}), 409 
     
     try:
         file_storage.save(destination_file_path)

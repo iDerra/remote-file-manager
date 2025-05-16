@@ -65,7 +65,7 @@
             display: flex;
             flex-wrap: wrap; 
             gap: 20px; 
-            align-items: flex-start;
+            align-items: flex-end;
         }
         .form-section {
             flex: 1; 
@@ -100,6 +100,25 @@
         .form-section input[type="submit"]:hover {
             background-color: #0056b3;
         }
+        .bulk-actions-container {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
 
         .flash-messages { list-style-type: none; padding: 0; margin-bottom: 15px; }
         .flash-messages li { padding: 10px 15px; margin-bottom: 10px; border-radius: 4px; border: 1px solid transparent; }
@@ -110,20 +129,18 @@
 
     </style>
 </head>
-<body>
-
-    <div class="page-header">
+<div class="page-header">
         <h1>Exploring: /{{ current_path_display }}</h1>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
+    {% if messages %}
         <ul class="flash-messages">
         {% for category, message in messages %}
-          <li class="alert-{{ category }}">{{ message }}</li>
+        <li class="alert-{{ category }}">{{ message }}</li>
         {% endfor %}
         </ul>
-      {% endif %}
+    {% endif %}
     {% endwith %}
 
     {% if parent_path_url %}
@@ -138,7 +155,7 @@
         <div class="form-section">
             <h3><i class="fas fa-folder-plus icon"></i>Create New Folder</h3>
             <form action="{{ url_for('actions.create_folder', parent_folder_segment=current_path_for_forms) }}" method="post">
-                <input type="text" name="new_folder_name" placeholder="Nombre de la carpeta" required>
+                <input type="text" name="new_folder_name" placeholder="Name of the folder" required>
                 <input type="submit" value="Create Folder">
             </form>
         </div>
@@ -161,10 +178,18 @@
         </div>
     </div>
 
+    <div id="bulk-actions-container" class="bulk-actions-container" style="display:none; margin-bottom: 20px;">
+        <h4>Actions for selected:</h4>
+        <button id="delete-selected-btn" class="btn-danger" data-delete-url="{{ url_for('actions.delete_multiple_items') }}">
+            <i class="fas fa-trash-alt"></i> Remove Selected
+        </button>
+        </div>
+
     <table>
         <thead>
             <tr>
-                <th style="width: 40%;">Name</th>
+                <th style="width: 5%; text-align: center;"><input type="checkbox" id="select-all-checkbox" title="Seleccionar todo/nada"></th>
+                <th style="width: 35%;">Name</th>
                 <th style="width: 10%;">Size</th>
                 <th style="width: 15%;">Modified</th>
                 <th style="width: 35%;" class="actions-cell">Actions</th>
@@ -173,6 +198,9 @@
         <tbody>
             {% for item in items %}
             <tr>
+                <td style="text-align: center;">
+                    <input type="checkbox" class="item-checkbox" name="selected_items" value="{{ item.id_path }}" data-name="{{ item.name|e }}">
+                </td>
                 <td>
                     {% if item.is_dir %}
                         <i class="fas fa-folder icon" style="color: #FFD700;"></i>
@@ -201,13 +229,13 @@
                         <i class="fas {{ 'fa-file-archive' if item.is_dir else 'fa-download' }} icon" style="color: {{ '#e67e22' if item.is_dir else '#2ecc71' }};"></i>
                     </a>
 
-                    <form action="{{ url_for('actions.delete_item', item_to_delete_segment=item.id_path) }}" method="post" onsubmit="return confirm('¿Estás seguro de que quieres eliminar \'{{ item.name|e }}\'? \n\nESTA ACCIÓN ES IRREVERSIBLE.');">
+                    <form action="{{ url_for('actions.delete_item', item_to_delete_segment=item.id_path) }}" method="post" onsubmit="return confirm('Are you sure you want to remove \'{{ item.name|e }}\'? \n\nTHIS ACTION IS IRREVERSIBLE.');" style="display: inline-block;">
                         <button type="submit" title="Delete {{ item.name }}">
                             <i class="fas fa-trash-alt icon" style="color: #dc3545;"></i>
                         </button>
                     </form>
 
-                    <form action="{{ url_for('actions.move_item', item_to_move_segment=item.id_path) }}" method="post">
+                    <form action="{{ url_for('actions.move_item', item_to_move_segment=item.id_path) }}" method="post" style="display: inline-block;">
                         <input type="text" name="destination_path" placeholder="Move to (relative_path)" required 
                                title="Destination path relative to the root of the manager (e.g. destination_folder or sub_destination_folder)">
                         <button type="submit" title="Mover {{ item.name }}">
@@ -218,7 +246,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="4" style="text-align: center; padding: 20px; color: #888;">
+                <td colspan="5" style="text-align: center; padding: 20px; color: #888;">
                     The directory is empty.
                     <br><small>You can create a folder or upload files using the forms above.</small>
                 </td>
@@ -226,6 +254,7 @@
             {% endfor %}
         </tbody>
     </table>
-    <script src="{{ url_for('static', filename='js/upload_progress.js') }}"></script>
+    <div id="bulk-actions-summary" style="margin-top: 10px;"></div> <script src="{{ url_for('static', filename='js/upload_progress.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/file_actions.js') }}"></script> {# <-- Nuevo fichero JS #}
 </body>
 </html>
