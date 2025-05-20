@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from werkzeug.utils import secure_filename
 from utils.utilsHandler import is_safe_path
+from urllib.parse import unquote
 
 files_bp = Blueprint('files', __name__)
 
@@ -132,4 +133,98 @@ def upload_files(destination_folder_segment):
     except Exception as e:
         current_app.logger.error(f"Error saving file '{filename_secured}': {e}")
         return jsonify({"success": False, "filename": filename_secured, "message": f"Error saving the file '{filename_secured}'."}), 500
+
+
+@files_bp.route('/download_multiple_files_zip', methods=['POST'])
+def download_multiple_files_zip():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"success": False, "message": "Invalid request."}), 400
+
+    item_paths_quoted = data.get('items_to_download')
+    user_zip_name = data.get('zip_name', 'archive.zip') 
+
+    if not item_paths_quoted or not isinstance(item_paths_quoted, list):
+        return jsonify({"success": False, "message": "No items specified for download or invalid format."}), 400
     
+    if not user_zip_name.endswith('.zip'):
+        user_zip_name += '.zip'
+    
+    zip_name_secured = secure_filename(user_zip_name)
+    if not zip_name_secured:
+        zip_name_secured = "downloaded_items.zip"
+
+    staging_dir = None
+    zip_creation_temp_dir = None
+
+    try:
+        staging_dir = tempfile.mkdtemp()
+        zip_creation_temp_dir = tempfile.mkdtemp()
+        
+        items_processed_count = 0
+        for item_path_q in item_paths_quoted:
+            item_path_unquoted = unquote(item_path_q)
+
+            if not is_safe_path(FILE_SYSTEM_ROOT, item_path_unquoted):
+                current_app.logger.warning(f"Multi-download: Unsafe path skipped: {item_path_unquoted}")
+                continue
+            
+            absolute_item_path = os.path.join(FILE_SYSTEM_ROOT, item_path_unquoted)
+
+            if not os.path.exists(absolute_item_path):
+                current_app.logger.warning(f"Multi-download: Item '{item_path_unquoted}' not found, skipped.")
+                continue
+
+            destination_path_in_staging = os.path.join(staging_dir, item_path_unquoted)
+            destination_parent_dir_in_staging = os.path.dirname(destination_path_in_staging)
+            if destination_parent_dir_in_staging and not os.path.exists(destination_parent_dir_in_staging):
+                os.makedirs(destination_parent_dir_in_staging, exist_ok=True)
+
+            if os.path.isfile(absolute_item_path):
+                shutil.copy2(absolute_item_path, destination_path_in_staging)
+                items_processed_count += 1
+            elif os.path.isdir(absolute_item_path):
+                shutil.copytree(absolute_item_path, destination_path_in_staging)
+                items_processed_count += 1
+            else:
+                current_app.logger.warning(f"Multi-download: Item '{item_path_unquoted}' is not a recognized file or folder, skipped.")
+
+        if items_processed_count == 0:
+            if staging_dir and os.path.exists(staging_dir): shutil.rmtree(staging_dir)
+            if zip_creation_temp_dir and os.path.exists(zip_creation_temp_dir): shutil.rmtree(zip_creation_temp_dir)
+            return jsonify({"success": False, "message": "No valid files or folders were found to include in the ZIP."}), 400
+
+        zip_file_base_name = os.path.join(zip_creation_temp_dir, os.path.splitext(zip_name_secured)[0])
+
+        archive_path = shutil.make_archive(
+            base_name=zip_file_base_name,
+            format='zip',
+            root_dir=staging_dir
+        )
+
+        @after_this_request
+        def cleanup(response):
+            nonlocal staging_dir, zip_creation_temp_dir
+            try:
+                if staging_dir and os.path.exists(staging_dir):
+                    shutil.rmtree(staging_dir)
+            except Exception as e:
+                current_app.logger.error(f"Error cleaning up staging directory for multi-download: {e}")
+            try:
+                if zip_creation_temp_dir and os.path.exists(zip_creation_temp_dir):
+                    shutil.rmtree(zip_creation_temp_dir)
+            except Exception as e:
+                current_app.logger.error(f"Error cleaning up ZIP creation directory for multi-download: {e}")
+            return response
+            
+        return send_file(archive_path, download_name=zip_name_secured, as_attachment=True)
+
+    except Exception as e:
+        current_app.logger.error(f"Error creating multi-item ZIP '{zip_name_secured}': {e}")
+        if staging_dir and os.path.exists(staging_dir):
+            shutil.rmtree(staging_dir)
+        if zip_creation_temp_dir and os.path.exists(zip_creation_temp_dir):
+            shutil.rmtree(zip_creation_temp_dir)
+        return jsonify({"success": False, "message": "Server error while creating the ZIP file."}), 500

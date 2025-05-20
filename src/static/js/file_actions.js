@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteSelectedBtn = document.getElementById('delete-selected-btn');
     const bulkActionsContainer = document.getElementById('bulk-actions-container');
     const bulkActionsSummary = document.getElementById('bulk-actions-summary');
+    const downloadSelectedZipBtn = document.getElementById('download-selected-zip-btn');
 
     function updateBulkActionsVisibility() {
         const selectedCheckboxes = Array.from(itemCheckboxes).filter(cb => cb.checked);
@@ -25,6 +26,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 selectAllCheckbox.indeterminate = true;
             }
         }
+    }
+
+    function getFormattedDateTime() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const day = now.getDate().toString().padStart(2, '0');
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const seconds = now.getSeconds().toString().padStart(2, '0');
+        return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
     }
 
     if (selectAllCheckbox) {
@@ -109,6 +121,81 @@ document.addEventListener('DOMContentLoaded', function () {
                     bulkActionsSummary.innerHTML = `<p style="color: red;">Error during operation: ${error.message}</p>`;
                 });
             }
+        });
+    }
+
+    if (downloadSelectedZipBtn) {
+        downloadSelectedZipBtn.addEventListener('click', function() {
+            const selectedItemsPaths = Array.from(itemCheckboxes)
+                .filter(checkbox => checkbox.checked)
+                .map(checkbox => checkbox.value);
+
+            if (selectedItemsPaths.length === 0) {
+                alert('Please select at least one file to include in the ZIP.');
+                return;
+            }
+
+            const timestamp = getFormattedDateTime();
+            const zipFileName = `files_${timestamp}.zip`;
+
+            const downloadUrl = downloadSelectedZipBtn.dataset.downloadZipUrl;
+            if (!downloadUrl) {
+                alert('Error: The URL for the download action could not be found.');
+                return;
+            }
+
+            bulkActionsSummary.innerHTML = `<p>Preparing ZIP file: '${zipFileName}'...</p>`;
+
+            fetch(downloadUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    items_to_download: selectedItemsPaths, 
+                    zip_name: zipFileName
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errData => {
+                        throw new Error(errData.message || `Server error: ${response.status}`);
+                    }).catch(() => {
+                        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                    });
+                }
+                const disposition = response.headers.get('Content-Disposition');
+                let effectiveFilename = zipFileName;
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[1]) {
+                        effectiveFilename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                return response.blob().then(blob => ({ blob, filename: effectiveFilename }));
+            })
+            .then(({ blob, filename }) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                
+                bulkActionsSummary.innerHTML = `<p style="color: green;">Download of '${filename}' initiated.</p>`;
+                itemCheckboxes.forEach(cb => cb.checked = false);
+                if(selectAllCheckbox) selectAllCheckbox.checked = false;
+                updateBulkActionsVisibility();
+            })
+            .catch(error => {
+                console.error('Error downloading multiple files as ZIP:', error);
+                bulkActionsSummary.innerHTML = `<p style="color: red;">Download error: ${error.message}</p>`;
+            });
         });
     }
     updateBulkActionsVisibility();
