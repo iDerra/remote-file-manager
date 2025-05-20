@@ -1,35 +1,54 @@
 import os
 from flask import Blueprint, render_template, url_for, abort, current_app, jsonify
-from urllib.parse import unquote
 from utils.utilsHandler import get_item_details, is_safe_path
 
 
-def _generate_folder_list_for_select(root_folder_abs_path):
-    folder_options = []
+def _build_folder_tree_recursive(current_path_abs, root_path_abs, current_depth=0):
+    """
+    Recursively builds a hierarchical tree structure of folders starting from
+    a given current path.
 
-    for current_dir_abs, sub_dirs, _ in os.walk(root_folder_abs_path):
-        sub_dirs.sort(key=lambda d: d.lower())
+    Each node in the tree represents a folder and contains its name,
+    relative path from the `root_path_abs`, depth in the tree, and a list
+    of its children (subfolders), which are also nodes.
 
-        for sub_dir_name in sub_dirs:
-            sub_dir_full_abs_path = os.path.join(current_dir_abs, sub_dir_name)
-            
-            relative_path = os.path.relpath(sub_dir_full_abs_path, root_folder_abs_path).replace('\\', '/')
-            if relative_path == '.':
-                relative_path = ""
+    :param current_path_abs: The absolute path of the directory currently being processed.
+    :type current_path_abs: str
+    :param root_path_abs: The absolute path of the root directory of the entire scan.
+                         Used to calculate relative paths.
+    :type root_path_abs: str
+    :param current_depth: The depth of the `current_path_abs` node in the tree,
+                          used for representation or client-side logic.
+    :type current_depth: int
+    :returns: A list of folder nodes. Each node is a dictionary with 'name',
+              'path', 'depth', and 'children' keys.
+    :rtype: list[dict]
+    """
+    
+    folder_tree_nodes = []
+    try:
+        items = sorted(
+            (item for item in os.listdir(current_path_abs) if os.path.isdir(os.path.join(current_path_abs, item))),
+            key=str.lower
+        )
+    except OSError:
+        current_app.logger.warning(f"The route to build the tree could not be accessed: {current_path_abs}")
+        return []
 
-            depth = relative_path.count('/')
-            indent_spaces = "\u00A0\u00A0\u00A0\u00A0" * depth
-            
-            display_name = f"{indent_spaces}{sub_dir_name}"
-            
-            folder_options.append({
-                'path': relative_path,
-                'display': display_name
-            })
-            
-    folder_options.sort(key=lambda x: x['path'].lower())
-    return folder_options
+    for item_name in items:
+        item_full_abs_path = os.path.join(current_path_abs, item_name)
 
+        relative_path = os.path.relpath(item_full_abs_path, root_path_abs).replace('\\', '/')
+        
+        node = {
+            'name': item_name,
+            'path': relative_path,
+            'depth': current_depth,
+            'children': _build_folder_tree_recursive(item_full_abs_path, root_path_abs, current_depth + 1)
+        }
+        folder_tree_nodes.append(node)
+    return folder_tree_nodes
+    
 
 browse_bp = Blueprint('browse', __name__)
 
@@ -37,7 +56,29 @@ browse_bp = Blueprint('browse', __name__)
 @browse_bp.route('/browse/')
 @browse_bp.route('/browse/<path:subpath>')
 
+
 def browse_directory(subpath=''):
+    """
+    Handles browsing of directories within the configured FILE_SYSTEM_ROOT.
+
+    It displays the contents (files and folders) of the specified `subpath`.
+    If `subpath` is empty, it displays the contents of the FILE_SYSTEM_ROOT.
+    The function performs security checks to ensure the requested path is safe
+    and actually exists. It gathers details for each item (like name, type, URLs
+    for download/navigation) and passes them to the 'index.html' template.
+
+    Multiple routes map to this function to allow flexible URL access.
+
+    :param subpath: The relative path from the FILE_SYSTEM_ROOT to the directory
+                    to be browsed. Defaults to an empty string, which means
+                    the root directory.
+    :type subpath: str
+    :returns: A rendered HTML page ('index.html') displaying the directory contents,
+              or an HTTP error (404 or 500) if the path is invalid, not found,
+              or an error occurs.
+    :rtype: str | werkzeug.wrappers.response.Response
+    """
+
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     
     current_fs_path_for_os = subpath
@@ -95,16 +136,30 @@ def browse_directory(subpath=''):
                            parent_path_url=parent_path_url)
 
 
-@browse_bp.route('/api/list-all-folders')
-def api_list_all_folders():
+@browse_bp.route('/api/list-all-folders-tree')
+def api_list_all_folders_tree():
+    """
+    API endpoint to retrieve a hierarchical tree structure of all discoverable
+    folders (subdirectories) within the configured FILE_SYSTEM_ROOT.
+
+    This is useful for UI elements that need to display a folder tree, such as
+    a navigation pane or a more complex folder selection dialog.
+    It uses the `_build_folder_tree_recursive` helper function.
+
+    :returns: A Flask JSON response containing a list of root-level folder nodes.
+              Each node has 'name', 'path', 'depth', and 'children' (recursively).
+              Returns a JSON error object and HTTP 500 status on failure.
+    :rtype: tuple[werkzeug.wrappers.response.Response, int]
+    """
+    
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     if not os.path.isdir(FILE_SYSTEM_ROOT):
         current_app.logger.error(f"FILE_SYSTEM_ROOT '{FILE_SYSTEM_ROOT}' is not a valid directory.")
         return jsonify({"error": "Server configuration error: Root directory not found."}), 500
-        
+
     try:
-        folder_list = _generate_folder_list_for_select(FILE_SYSTEM_ROOT)
-        return jsonify(folder_list)
+        folder_tree = _build_folder_tree_recursive(FILE_SYSTEM_ROOT, FILE_SYSTEM_ROOT)
+        return jsonify(folder_tree)
     except Exception as e:
-        current_app.logger.error(f"Error generating folder list for move: {e}")
-        return jsonify({"error": "Could not retrieve folder list."}), 500
+        current_app.logger.error(f"Error generating the folder tree to move: {e}")
+        return jsonify({"error": "The list of folders could not be retrieved."}), 500

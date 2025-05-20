@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const bulkActionsSummary = document.getElementById('bulk-actions-summary');
 
     const moveItemModal = document.getElementById('move-item-modal');
     const modalCloseBtn = moveItemModal ? moveItemModal.querySelector('.modal-close-btn') : null;
@@ -9,111 +8,199 @@ document.addEventListener('DOMContentLoaded', function () {
     const modalMoveCancelBtn = moveItemModal ? document.getElementById('modal-move-cancel-btn') : null;
     const openMoveModalButtons = document.querySelectorAll('.open-move-modal-btn');
 
-    let selectedDestinationPathInModal = null;
     let itemsToProcessInModal = [];
+    let selectedDestinationPathInModal = null;
 
+    /**
+     * Updates the enabled/disabled state of the modal's confirm button.
+     * The button is enabled only if a destination folder has been selected.
+     */
     function updateModalConfirmButtonState() {
         if (!modalMoveConfirmBtn) return;
-        if (selectedDestinationPathInModal !== null) {
-            modalMoveConfirmBtn.disabled = false;
-        } else {
-            modalMoveConfirmBtn.disabled = true;
-        }
-    }
-    
-    function openSingleItemMoveModal(itemPath, itemName) {
-        if (!moveItemModal || !modalItemNameDisplay || !modalFolderListContainer) return;
-        itemsToProcessInModal = [itemPath];
-        modalItemNameDisplay.textContent = `Item: ${itemName}`;
-        selectedDestinationPathInModal = null;
-        modalFolderListContainer.innerHTML = '<p class="loading-text">Loading folders...</p>';
-        moveItemModal.style.display = 'block';
-        populateModalFolderList();
-        updateModalConfirmButtonState();
+        modalMoveConfirmBtn.disabled = selectedDestinationPathInModal === null;
     }
 
+    /**
+     * Opens the move modal for a single item.
+     * @param {string} itemPath - The path of the item to be moved.
+     * @param {string} itemName - The display name of the item.
+     */
+    function openSingleItemMoveModal(itemPath, itemName) {
+        if (!moveItemModal || !modalItemNameDisplay) return;
+        itemsToProcessInModal = [itemPath];
+        modalItemNameDisplay.textContent = `Item: ${itemName}`;
+        openModalSharedLogic();
+    }
+
+    /**
+     * Opens the move modal for multiple items. This function is exposed globally
+     * so it can be called from other scripts (e.g., bulk actions script).
+     * @param {string[]} itemPathsList - An array of paths for the items to be moved.
+     * @global
+     */
     window.openMoveModalForItems = function(itemPathsList) {
-        if (!moveItemModal || !modalItemNameDisplay || !modalFolderListContainer) return;
+        if (!moveItemModal || !modalItemNameDisplay) return;
         if (!itemPathsList || itemPathsList.length === 0) {
             console.warn("No items provided to openMoveModalForItems");
             return;
         }
         itemsToProcessInModal = itemPathsList;
         modalItemNameDisplay.textContent = `${itemPathsList.length} item(s) selected`;
+        openModalSharedLogic();
+    }
+
+    /**
+     * Contains shared logic for opening the move modal, whether for single or multiple items.
+     * Resets modal state, displays loading text for the folder list, shows the modal,
+     * and initiates fetching of the folder list.
+     */
+    function openModalSharedLogic() {
         selectedDestinationPathInModal = null;
-        modalFolderListContainer.innerHTML = '<p class="loading-text">Loading folders...</p>';
-        moveItemModal.style.display = 'block';
+        if (modalFolderListContainer) modalFolderListContainer.innerHTML = '<p class="loading-text">Loading folders...</p>';
+        if (moveItemModal) moveItemModal.style.display = 'block';
         populateModalFolderList();
         updateModalConfirmButtonState();
     }
 
+    /**
+     * Closes the move item modal and resets its state.
+     */
     function closeMoveItemModal() {
         if (!moveItemModal) return;
         moveItemModal.style.display = 'none';
-        currentMovingItemPath = null;
-        selectedDestinationPathInModal = null;
+        itemsToProcessInModal = []; 
+        selectedDestinationPathInModal = null; 
     }
 
-    function populateModalFolderList() {
-        if (!modalFolderListContainer) return;
-        if (typeof listFoldersApiUrl === 'undefined') {
-            modalFolderListContainer.innerHTML = '<p class="loading-text">Error: API URL not configured.</p>';
-            console.error("listFoldersApiUrl is not defined. Make sure to define it in your HTML before loading this script.");
-            return;
-        }
-
-        fetch(listFoldersApiUrl)
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error ${response.status} fetching folder list.`);
-                return response.json();
-            })
-            .then(folderList => {
-                if (folderList.error) {
-                    console.error('Error from server fetching folder list:', folderList.error);
-                    modalFolderListContainer.innerHTML = `<p class="loading-text">Error loading folders: ${folderList.error}</p>`;
-                    return;
-                }
-
-                modalFolderListContainer.innerHTML = ''; 
-                const ul = document.createElement('ul');
-
-                const rootLi = document.createElement('li');
-                rootLi.textContent = 'Root';
-                rootLi.dataset.path = ""; 
-                rootLi.addEventListener('click', function() {
-                    handleFolderSelectionInModal(this, "");
-                });
-                ul.appendChild(rootLi);
-
-                folderList.forEach(folder => {
-                    const li = document.createElement('li');
-                    li.textContent = folder.display; 
-                    li.dataset.path = folder.path;
-                    li.addEventListener('click', function() {
-                        handleFolderSelectionInModal(this, folder.path);
-                    });
-                    ul.appendChild(li);
-                });
-                modalFolderListContainer.appendChild(ul);
-            })
-            .catch(error => {
-                console.error('Failed to fetch or populate folder list for move:', error);
-                modalFolderListContainer.innerHTML = `<p class="loading-text">Failed to load folders. ${error.message}</p>`;
-            });
-    }
-
+    /**
+     * Handles the selection of a folder within the modal's folder tree.
+     * Updates the `selectedDestinationPathInModal` and visually highlights the selected folder.
+     * @param {HTMLLIElement} selectedLiElement - The list item element that was clicked.
+     * @param {string} folderPath - The path of the selected folder.
+     */
     function handleFolderSelectionInModal(selectedLiElement, folderPath) {
         if (!modalFolderListContainer) return;
         selectedDestinationPathInModal = folderPath;
 
-        const allLis = modalFolderListContainer.querySelectorAll('li');
-        allLis.forEach(li => li.classList.remove('selected'));
-
-        selectedLiElement.classList.add('selected');
+        modalFolderListContainer.querySelectorAll('li.folder-item').forEach(li => li.classList.remove('selected'));
+        if (selectedLiElement) {
+             selectedLiElement.classList.add('selected');
+        }
         updateModalConfirmButtonState();
     }
+    
+    /**
+     * Recursively creates list item elements for the folder tree display in the modal.
+     * Each folder can be expanded/collapsed if it has children.
+     * @param {object} folderData - Data for the folder, including name, path, and children.
+     * @param {string} folderData.name - The display name of the folder.
+     * @param {string} folderData.path - The relative path of the folder.
+     * @param {object[]} folderData.children - An array of child folder data objects.
+     * @param {boolean} [isRootPseudoFolder=false] - Flag to indicate if this is the virtual "Root" folder.
+     * @returns {HTMLLIElement} The created list item element representing the folder.
+     */
+    function createFolderListItem(folderData, isRootPseudoFolder = false) {
+        const li = document.createElement('li');
+        li.classList.add('folder-item');
+        li.dataset.path = folderData.path;
 
-    if (moveItemModal) { 
+        const contentWrapper = document.createElement('div');
+        contentWrapper.classList.add('folder-content-wrapper');
+
+        const toggleIcon = document.createElement('i');
+        toggleIcon.classList.add('fas', 'folder-toggle-icon');
+        if ((isRootPseudoFolder && folderData.children && folderData.children.length > 0) || (!isRootPseudoFolder && folderData.children && folderData.children.length > 0)) {
+            toggleIcon.classList.add('fa-caret-right');
+        } else {
+            toggleIcon.classList.add('no-children');
+        }
+
+        const folderIconElement = document.createElement('i');
+        folderIconElement.classList.add('fas', isRootPseudoFolder ? 'fa-hdd' : 'fa-folder', 'folder-icon-tree');
+
+        const folderNameSpan = document.createElement('span');
+        folderNameSpan.classList.add('folder-name');
+        folderNameSpan.textContent = folderData.name;
+
+        contentWrapper.appendChild(toggleIcon);
+        contentWrapper.appendChild(folderIconElement);
+        contentWrapper.appendChild(folderNameSpan);
+        li.appendChild(contentWrapper);
+
+        contentWrapper.addEventListener('click', (event) => {
+            event.stopPropagation();
+            handleFolderSelectionInModal(li, folderData.path);
+        });
+
+        if (folderData.children && folderData.children.length > 0) {
+            const subList = document.createElement('ul');
+            subList.classList.add('subfolder-list');
+            subList.style.display = 'none';
+
+            folderData.children.forEach(childFolder => {
+                subList.appendChild(createFolderListItem(childFolder));
+            });
+            li.appendChild(subList);
+
+            toggleIcon.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const isExpanded = subList.style.display === 'block';
+                subList.style.display = isExpanded ? 'none' : 'block';
+                toggleIcon.classList.toggle('fa-caret-right', isExpanded);
+                toggleIcon.classList.toggle('fa-caret-down', !isExpanded);
+                li.classList.toggle('expanded', !isExpanded);
+            });
+        }
+        return li;
+    }
+
+    /**
+     * Fetches the folder tree structure from the server API and populates the modal's list.
+     * Displays loading and error messages as appropriate.
+     * A "Root" pseudo-folder is added to allow moving items to the base directory.
+     */
+    function populateModalFolderList() {
+        if (!modalFolderListContainer) return;
+        if (typeof listFoldersTreeApiUrl === 'undefined') { 
+            modalFolderListContainer.innerHTML = '<p class="loading-text">Error: Tree API URL not configured.</p>';
+            console.error("listFoldersTreeApiUrl is not defined. Check index.html script block.");
+            return;
+        }
+
+        fetch(listFoldersTreeApiUrl)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error ${response.status} fetching folder tree.`);
+                return response.json();
+            })
+            .then(folderTreeData => {
+                if (folderTreeData.error) {
+                    console.error('Error from server fetching folder tree:', folderTreeData.error);
+                    modalFolderListContainer.innerHTML = `<p class="loading-text">Error loading folders: ${folderTreeData.error}</p>`;
+                    return;
+                }
+
+                modalFolderListContainer.innerHTML = '';
+                const ul = document.createElement('ul');
+                ul.classList.add('top-level-folder-list');
+
+                const rootPseudoFolder = {
+                    name: 'Root',
+                    path: '',
+                    children: folderTreeData,
+                    depth: 0 
+                };
+                ul.appendChild(createFolderListItem(rootPseudoFolder, true));
+
+                modalFolderListContainer.appendChild(ul);
+            })
+            .catch(error => {
+                console.error('Failed to fetch or populate folder tree for move:', error);
+                modalFolderListContainer.innerHTML = `<p class="loading-text">Failed to load folders. ${error.message}</p>`;
+            });
+    }
+
+
+    if (moveItemModal) {
         openMoveModalButtons.forEach(button => {
             button.addEventListener('click', function() {
                 const itemPath = this.dataset.itemPath;
@@ -122,41 +209,38 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        if (modalCloseBtn) {
-            modalCloseBtn.addEventListener('click', closeMoveItemModal);
-        }
-        if (modalMoveCancelBtn) {
-            modalMoveCancelBtn.addEventListener('click', closeMoveItemModal);
-        }
-
+        if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeMoveItemModal);
+        if (modalMoveCancelBtn) modalMoveCancelBtn.addEventListener('click', closeMoveItemModal);
         window.addEventListener('click', function(event) {
-            if (event.target === moveItemModal) {
-                closeMoveItemModal();
-            }
+            if (event.target === moveItemModal) closeMoveItemModal();
         });
 
         if (modalMoveConfirmBtn) {
             modalMoveConfirmBtn.addEventListener('click', function() {
+                /**
+                 * Handles the click event for the modal's "Confirm Move" button.
+                 * Validates that items and a destination are selected.
+                 * Sends a POST request to the server API to move the items.
+                 * Reloads the page on success, shows an alert on error.
+                 */
                 if (itemsToProcessInModal.length === 0 || selectedDestinationPathInModal === null) {
                     alert('No items to move or no destination folder selected.');
                     return;
                 }
-
+    
                 if (typeof moveMultipleItemsApiUrl === 'undefined') {
-                    console.error("moveMultipleItemsApiUrl is not defined. Make sure to define it in your HTML.");
-                    if(bulkActionsSummary) bulkActionsSummary.innerHTML = `<p style="color: red;">Error: Move action URL not configured.</p>`;
+                    console.error("moveMultipleItemsApiUrl is not defined. Check index.html script block.");
+                    alert("Error: Move action URL not configured."); // User-facing error
                     return;
                 }
-                const moveMultipleUrl = moveMultipleItemsApiUrl;
-        
+                const moveUrl = moveMultipleItemsApiUrl;
+    
                 const payload = {
                     items_to_move: itemsToProcessInModal,
                     destination_path: selectedDestinationPathInModal
                 };
-
-                if(bulkActionsSummary) bulkActionsSummary.innerHTML = `<p>Moving ${itemsToProcessInModal.length} item(s)...</p>`;
-
-                fetch(moveMultipleUrl, {
+    
+                fetch(moveUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -165,69 +249,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
                 .then(response => {
                     if (!response.ok) {
+                         
                          return response.json().then(errData => {
-                            let serverMessage = 'Unknown server error';
-                            if (errData && errData.message) {
-                                serverMessage = errData.message;
-                            } else if (errData && errData.details) {
-                                serverMessage = errData.details.map(d => `${d.item_name || 'Item'}: ${d.message}`).join('; ');
-                            }
-                            throw new Error(serverMessage || `Server error: ${response.status}`);
-                        }).catch(() => {
-                            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                            let serverMessage = `Server error: ${response.status} ${response.statusText}`;
+                            if (errData && errData.message) serverMessage = errData.message;
+                            throw new Error(serverMessage);
+                        }).catch((e) => { 
+                            if (e instanceof Error && e.message.startsWith("Server error:")) throw e;
+                            throw new Error(`Server error: ${response.status} ${response.statusText}. Could not parse error details.`);
                         });
                     }
-                    return response.json();
+                    return response.json(); 
                 })
                 .then(data => {
-                    let summaryHtml = `<h4>Result of move operation:</h4>`;
-
-                    if (data.message) {
-                        summaryHtml += `<p>${data.message}</p>`;
-                    }
-
-                    let successfulMoves = 0;
-                    let totalProcessed = 0;
-
-                    if (data.details && Array.isArray(data.details)) {
-                        totalProcessed = data.details.length;
-                        data.details.forEach(detail => {
-                            if (detail.success) {
-                                successfulMoves++;
-                            }
-                        });
-
-                        if (totalProcessed > 0) {
-                            if (data.overall_success && successfulMoves === totalProcessed) {
-                                summaryHtml += `<p style="color: green;">${successfulMoves} of ${totalProcessed} item(s) processed successfully.</p>`;
-                            } else if (successfulMoves > 0 && successfulMoves < totalProcessed) {
-                                summaryHtml += `<p style="color: orange;">${successfulMoves} of ${totalProcessed} item(s) moved successfully. Some items may have failed.</p>`;
-                            } else if (successfulMoves === 0 && totalProcessed > 0 && !data.overall_success) {
-                                summaryHtml += `<p style="color: red;">0 of ${totalProcessed} item(s) were moved. Check server logs if message above is not clear.</p>`;
-                            }
-                        }
-                    } else if (data.overall_success) {
-                        summaryHtml += `<p style="color: green;">Operation completed successfully.</p>`;
-                    } else if (data.overall_success === false && !data.message) {
-                        summaryHtml += `<p style="color: red;">Operation failed with no specific details.</p>`;
-                    }
-
-                    if(bulkActionsSummary) bulkActionsSummary.innerHTML = summaryHtml;
-
-                    if (data.overall_success !== false) {
-                         setTimeout(() => {
-                            window.location.reload();
-                        }, data.details && data.details.length > 5 ? 4000 : 2000);
-                    }
                     closeMoveItemModal();
+                    setTimeout(() => { 
+                        window.location.reload();
+                    }, 200); 
                 })
                 .catch(error => {
-                    console.error('Error moving items:', error);
-                    if(bulkActionsSummary) bulkActionsSummary.innerHTML = `<p style="color: red;">Error moving items: ${error.message}</p>`;
+                    console.error('[move_modal.js] Final error moving items:', error);
+                    alert(`Error moving items: ${error.message}`);
                 });
             });
         }
-    } else {
-        console.warn('move_modal.js: moveItemModal element NOT found when trying to attach listeners.');
     }
 });
