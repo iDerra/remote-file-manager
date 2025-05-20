@@ -205,3 +205,114 @@ def delete_multiple_items():
         "message": final_message,
         "details": results_details
     }), 200
+
+
+@actions_bp.route('/move_multiple_items', methods=['POST'])
+def move_multiple_items():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"overall_success": False, "message": "Invalid request data.", "details": []}), 400
+
+    items_to_move_quoted = data.get('items_to_move')
+    destination_relative_path_form = data.get('destination_path', '')
+
+    if not items_to_move_quoted or not isinstance(items_to_move_quoted, list):
+        return jsonify({"overall_success": False, "message": "No items specified for move or invalid format.", "details": []}), 400
+
+    normalized_destination_relative_path = destination_relative_path_form.strip().lstrip('/')
+
+    if not is_safe_path(FILE_SYSTEM_ROOT, normalized_destination_relative_path):
+        return jsonify({"overall_success": False, "message": "Error: The destination path is invalid or not allowed.", "details": []}), 400
+
+    destination_directory_abs = os.path.join(FILE_SYSTEM_ROOT, normalized_destination_relative_path)
+
+    if not os.path.exists(destination_directory_abs) or not os.path.isdir(destination_directory_abs):
+        return jsonify({"overall_success": False, "message": f"Error: The target directory '{normalized_destination_relative_path or 'Root'}' does not exist or is not a directory.", "details": []}), 400
+
+    results_details = []
+    overall_success = True
+    any_successful_moves = False
+
+    for item_segment_quoted in items_to_move_quoted:
+        item_segment_unquoted = unquote(item_segment_quoted)
+        item_name_display = os.path.basename(item_segment_unquoted) if item_segment_unquoted else "Invalid Item Path"
+
+        current_item_detail = {
+            "item_name": item_name_display,
+            "item_path": item_segment_unquoted,
+            "success": False,
+            "message": ""
+        }
+
+        if not item_segment_unquoted or item_segment_unquoted == '__root__':
+            current_item_detail["message"] = "The root directory or invalid item cannot be moved."
+            results_details.append(current_item_detail)
+            overall_success = False
+            continue
+
+        if not is_safe_path(FILE_SYSTEM_ROOT, item_segment_unquoted):
+            current_item_detail["message"] = "Invalid or not allowed source path."
+            results_details.append(current_item_detail)
+            overall_success = False
+            continue
+
+        source_path_abs = os.path.join(FILE_SYSTEM_ROOT, item_segment_unquoted)
+        final_destination_path_abs = os.path.join(destination_directory_abs, os.path.basename(source_path_abs))
+
+        if not os.path.exists(source_path_abs):
+            current_item_detail["message"] = "Source item does not exist (it may have been moved or deleted)."
+            results_details.append(current_item_detail)
+            overall_success = False
+            continue
+
+        if source_path_abs == final_destination_path_abs:
+            current_item_detail["message"] = "Source and destination are the same."
+            current_item_detail["success"] = True
+            results_details.append(current_item_detail)
+            continue
+
+        if os.path.exists(final_destination_path_abs):
+            current_item_detail["message"] = f"An item already exists at the destination with the name '{os.path.basename(source_path_abs)}'."
+            results_details.append(current_item_detail)
+            overall_success = False
+            continue
+
+        if os.path.isdir(source_path_abs) and final_destination_path_abs.startswith(source_path_abs + os.sep):
+            current_item_detail["message"] = "A folder cannot be moved into itself or one of its subdirectories."
+            results_details.append(current_item_detail)
+            overall_success = False
+            continue
+
+        try:
+            shutil.move(source_path_abs, final_destination_path_abs)
+            current_item_detail["message"] = f"Successfully moved to '{normalized_destination_relative_path or 'Root'}'."
+            current_item_detail["success"] = True
+            any_successful_moves = True
+        except Exception as e:
+            current_app.logger.error(f"Error moving '{source_path_abs}' to '{final_destination_path_abs}': {e}")
+            current_item_detail["message"] = f"Error during move operation: {str(e)}"
+            overall_success = False
+
+        results_details.append(current_item_detail)
+
+    final_overall_success = overall_success and any_successful_moves
+    if not any_successful_moves and not overall_success :
+         final_message = "None of the selected items could be moved due to errors or issues."
+    elif not overall_success and any_successful_moves:
+         final_message = "Some items were moved, but errors occurred with others."
+    elif overall_success and any_successful_moves:
+         final_message = "All selected items were successfully moved."
+    elif not any_successful_moves and overall_success:
+        final_message = "No items needed to be moved or no action was taken."
+        final_overall_success = True
+    else:
+        final_message = "Move operation completed with mixed results."
+
+
+    return jsonify({
+        "overall_success": final_overall_success,
+        "message": final_message,
+        "details": results_details
+    }), 200

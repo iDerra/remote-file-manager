@@ -1,7 +1,35 @@
 import os
-from flask import Blueprint, render_template, url_for, abort, current_app
+from flask import Blueprint, render_template, url_for, abort, current_app, jsonify
 from urllib.parse import unquote
 from utils.utilsHandler import get_item_details, is_safe_path
+
+
+def _generate_folder_list_for_select(root_folder_abs_path):
+    folder_options = []
+
+    for current_dir_abs, sub_dirs, _ in os.walk(root_folder_abs_path):
+        sub_dirs.sort(key=lambda d: d.lower())
+
+        for sub_dir_name in sub_dirs:
+            sub_dir_full_abs_path = os.path.join(current_dir_abs, sub_dir_name)
+            
+            relative_path = os.path.relpath(sub_dir_full_abs_path, root_folder_abs_path).replace('\\', '/')
+            if relative_path == '.':
+                relative_path = ""
+
+            depth = relative_path.count('/')
+            indent_spaces = "\u00A0\u00A0\u00A0\u00A0" * depth
+            
+            display_name = f"{indent_spaces}{sub_dir_name}"
+            
+            folder_options.append({
+                'path': relative_path,
+                'display': display_name
+            })
+            
+    folder_options.sort(key=lambda x: x['path'].lower())
+    return folder_options
+
 
 browse_bp = Blueprint('browse', __name__)
 
@@ -59,10 +87,24 @@ def browse_directory(subpath=''):
         else:
             parent_path_url = url_for('browse.browse_directory')
 
-
     return render_template('index.html',
                            items=items,
                            current_directory_display=display_current_folder_name,
                            current_path_display=display_current_logical_path,
                            current_path_for_forms=path_param_for_forms, 
                            parent_path_url=parent_path_url)
+
+
+@browse_bp.route('/api/list-all-folders')
+def api_list_all_folders():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    if not os.path.isdir(FILE_SYSTEM_ROOT):
+        current_app.logger.error(f"FILE_SYSTEM_ROOT '{FILE_SYSTEM_ROOT}' is not a valid directory.")
+        return jsonify({"error": "Server configuration error: Root directory not found."}), 500
+        
+    try:
+        folder_list = _generate_folder_list_for_select(FILE_SYSTEM_ROOT)
+        return jsonify(folder_list)
+    except Exception as e:
+        current_app.logger.error(f"Error generating folder list for move: {e}")
+        return jsonify({"error": "Could not retrieve folder list."}), 500

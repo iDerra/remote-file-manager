@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const bulkActionsContainer = document.getElementById('bulk-actions-container');
     const bulkActionsSummary = document.getElementById('bulk-actions-summary');
     const downloadSelectedZipBtn = document.getElementById('download-selected-zip-btn');
+    const moveSelectedBtn = document.getElementById('move-selected-btn');
 
     function updateBulkActionsVisibility() {
         const selectedCheckboxes = Array.from(itemCheckboxes).filter(cb => cb.checked);
@@ -196,6 +197,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.error('Error downloading multiple files as ZIP:', error);
                 bulkActionsSummary.innerHTML = `<p style="color: red;">Download error: ${error.message}</p>`;
             });
+        });
+    }
+
+    if (moveSelectedBtn) {
+        moveSelectedBtn.addEventListener('click', function() {
+            const selectedItemsPaths = Array.from(itemCheckboxes)
+                .filter(checkbox => checkbox.checked)
+                .map(checkbox => checkbox.value); 
+
+            if (selectedItemsPaths.length === 0) {
+                alert('Please select at least one item to move.');
+                return;
+            }
+
+            if (typeof window.openMoveModalForItems === 'function') {
+                window.openMoveModalForItems(selectedItemsPaths);
+            } else {
+                console.error('Move modal function (openMoveModalForItems) is not available.');
+                alert('Error: Move functionality is not properly initialized.');
+            }
         });
     }
     updateBulkActionsVisibility();
