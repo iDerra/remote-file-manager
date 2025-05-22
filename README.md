@@ -30,6 +30,10 @@ A web-based file manager built with Flask that allows users to browse, upload an
     * Item size (calculates total size for folders)
     * Last modified date
 
+## Screenshots
+
+![Remote File Manager UI](src/static/images/remote-file-manager-ui.png)
+
 ## Setup and Installation
 
 1.  **Clone the repository:**
