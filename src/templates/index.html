@@ -140,15 +140,21 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if item.size is not none %}
-                                {% if item.size < 1024 %}
-                                    <span class="size">{{ item.size }} B</span>
-                                {% elif item.size < 1024*1024 %}
-                                    <span class="size">{{ '%.2f' | format(item.size / 1024) }} KB</span>
-                                {% elif item.size < 1024*1024*1024 %}
-                                    <span class="size">{{ '%.2f' | format(item.size / (1024*1024)) }} MB</span>
-                                {% else %}
-                                    <span class="size">{{ '%.2f' | format(item.size / (1024*1024*1024)) }} GB</span>
+                            {% if item.is_dir %}
+                                <button class="btn" onclick="calculateFolderSize('{{ item.id_path }}', this)" title="Calculate real size" style="padding: 2px 8px; font-size: 0.8em; background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; color: #495057;">
+                                    <i class="fas fa-search"></i> Calculate
+                                </button>
+                            {% else %}
+                                {% if item.size is not none %}
+                                    {% if item.size < 1024 %}
+                                        <span class="size">{{ item.size }} B</span>
+                                    {% elif item.size < 1024*1024 %}
+                                        <span class="size">{{ '%.2f' | format(item.size / 1024) }} KB</span>
+                                    {% elif item.size < 1024*1024*1024 %}
+                                        <span class="size">{{ '%.2f' | format(item.size / (1024*1024)) }} MB</span>
+                                    {% else %}
+                                        <span class="size">{{ '%.2f' | format(item.size / (1024*1024*1024)) }} GB</span>
+                                    {% endif %}
                                 {% endif %}
                             {% endif %}
                         </td>
@@ -181,6 +187,33 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            {% if total_pages > 1 %}
+            <div class="pagination-container" style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; margin-bottom: 10px;">
+                
+                {% if page > 1 %}
+                    <a href="{{ url_for('browse.browse_directory', subpath=raw_subpath, page=page-1) }}" class="btn btn-secondary">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </a>
+                {% else %}
+                    <button class="btn btn-secondary" disabled><i class="fas fa-chevron-left"></i> Previous</button>
+                {% endif %}
+
+                <span style="font-weight: 500; color: #495057;">
+                    Page {{ page }} of {{ total_pages }} (Total: {{ total_items }} files and folders)
+                </span>
+
+                {% if page < total_pages %}
+                    <a href="{{ url_for('browse.browse_directory', subpath=raw_subpath, page=page+1) }}" class="btn btn-secondary">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </a>
+                {% else %}
+                    <button class="btn btn-secondary" disabled>Next <i class="fas fa-chevron-right"></i></button>
+                {% endif %}
+                
+            </div>
+            {% endif %}
+
         </div> 
         
         <div id="tab-torrents" class="tab-content">
@@ -634,6 +667,40 @@
             setTimeout(checkDLNAStatus, 500); 
         });
     </script>
+    <script>
+        window.calculateFolderSize = function(path, btnElement) {
+            const originalHtml = btnElement.innerHTML;
+            btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating...';
+            btnElement.disabled = true;
 
+            fetch('/api/item-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let bytes = data.size;
+                    let sizeStr = bytes + ' B';
+                    if (bytes >= 1073741824) sizeStr = (bytes / 1073741824).toFixed(2) + ' GB';
+                    else if (bytes >= 1048576) sizeStr = (bytes / 1048576).toFixed(2) + ' MB';
+                    else if (bytes >= 1024) sizeStr = (bytes / 1024).toFixed(2) + ' KB';
+
+                    const td = btnElement.parentElement;
+                    td.innerHTML = `<span class="size" style="font-weight:bold; color: #212529;">${sizeStr}</span><br><small style="color:#6c757d;">${data.file_count} files</small>`;
+                } else {
+                    btnElement.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:red;"></i> Error';
+                    btnElement.disabled = false;
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(err => {
+                btnElement.innerHTML = originalHtml;
+                btnElement.disabled = false;
+                alert('Error de red al intentar calcular el tamaño.');
+            });
+        };
+    </script>
 </body>
 </html>

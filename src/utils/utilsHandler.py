@@ -32,7 +32,7 @@ def get_item_details(fs_root_path, parent_relative_path, item_name):
     """
     Gathers details for a given file or folder item, including its name,
     paths (ID, relative), type (file/directory), size, and modification date.
-    For directories, the size represents the cumulative size of all items within.
+    For directories, the size is set to None to avoid performance bottlenecks (Lazy Loading).
 
     :param fs_root_path: The absolute path to the root of the managed file system.
     :type fs_root_path: str
@@ -46,8 +46,7 @@ def get_item_details(fs_root_path, parent_relative_path, item_name):
               - 'id_path' (str): URL-quoted relative path from fs_root_path, used as an ID.
               - 'relative_path_unquoted' (str): Unquoted relative path from fs_root_path.
               - 'is_dir' (bool): True if the item is a directory, False otherwise.
-              - 'size' (Optional[int]): Size in bytes. For directories, it's the total
-                                        size of its contents. None if size cannot be determined.
+              - 'size' (Optional[int]): Size in bytes. None for directories.
               - 'modified' (str): Last modification date formatted as 'YYYY-MM-DD HH:MM:SS',
                                   or 'N/A' if not determinable.
     :rtype: dict
@@ -74,10 +73,9 @@ def get_item_details(fs_root_path, parent_relative_path, item_name):
         details['is_dir'] = os.path.isdir(absolute_item_path)
 
         if details['is_dir']:
-            details['size'] = get_folder_size(absolute_item_path) # Calculate total size for the directory
+            details['size'] = None 
         else:
-            
-            details['size'] = stat_info.st_size # It's a file, get its size directly
+            details['size'] = stat_info.st_size 
 
         mod_time = datetime.fromtimestamp(stat_info.st_mtime)
         details['modified'] = mod_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -87,7 +85,7 @@ def get_item_details(fs_root_path, parent_relative_path, item_name):
         if os.path.exists(absolute_item_path):
             details['is_dir'] = os.path.isdir(absolute_item_path)
             if details['is_dir'] and details['size'] is None:
-                details['size'] = 0 
+                details['size'] = None
 
     return details
 

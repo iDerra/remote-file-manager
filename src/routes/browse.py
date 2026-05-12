@@ -1,30 +1,9 @@
 import os
-from flask import Blueprint, render_template, url_for, abort, current_app, jsonify
+import math
+from flask import Blueprint, render_template, url_for, abort, current_app, jsonify, request
 from utils.utilsHandler import get_item_details, is_safe_path
 
-
 def _build_folder_tree_recursive(current_path_abs, root_path_abs, current_depth=0):
-    """
-    Recursively builds a hierarchical tree structure of folders starting from
-    a given current path.
-
-    Each node in the tree represents a folder and contains its name,
-    relative path from the `root_path_abs`, depth in the tree, and a list
-    of its children (subfolders), which are also nodes.
-
-    :param current_path_abs: The absolute path of the directory currently being processed.
-    :type current_path_abs: str
-    :param root_path_abs: The absolute path of the root directory of the entire scan.
-                         Used to calculate relative paths.
-    :type root_path_abs: str
-    :param current_depth: The depth of the `current_path_abs` node in the tree,
-                          used for representation or client-side logic.
-    :type current_depth: int
-    :returns: A list of folder nodes. Each node is a dictionary with 'name',
-              'path', 'depth', and 'children' keys.
-    :rtype: list[dict]
-    """
-    
     folder_tree_nodes = []
     try:
         items = sorted(
@@ -37,7 +16,6 @@ def _build_folder_tree_recursive(current_path_abs, root_path_abs, current_depth=
 
     for item_name in items:
         item_full_abs_path = os.path.join(current_path_abs, item_name)
-
         relative_path = os.path.relpath(item_full_abs_path, root_path_abs).replace('\\', '/')
         
         node = {
@@ -55,30 +33,7 @@ browse_bp = Blueprint('browse', __name__)
 @browse_bp.route('/')
 @browse_bp.route('/browse/')
 @browse_bp.route('/browse/<path:subpath>')
-
-
 def browse_directory(subpath=''):
-    """
-    Handles browsing of directories within the configured FILE_SYSTEM_ROOT.
-
-    It displays the contents (files and folders) of the specified `subpath`.
-    If `subpath` is empty, it displays the contents of the FILE_SYSTEM_ROOT.
-    The function performs security checks to ensure the requested path is safe
-    and actually exists. It gathers details for each item (like name, type, URLs
-    for download/navigation) and passes them to the 'index.html' template.
-
-    Multiple routes map to this function to allow flexible URL access.
-
-    :param subpath: The relative path from the FILE_SYSTEM_ROOT to the directory
-                    to be browsed. Defaults to an empty string, which means
-                    the root directory.
-    :type subpath: str
-    :returns: A rendered HTML page ('index.html') displaying the directory contents,
-              or an HTTP error (404 or 500) if the path is invalid, not found,
-              or an error occurs.
-    :rtype: str | werkzeug.wrappers.response.Response
-    """
-
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     
     current_fs_path_for_os = subpath
@@ -96,24 +51,47 @@ def browse_directory(subpath=''):
         current_app.logger.error(f"Directory not found or not a directory (browse): {current_path_abs}")
         abort(404, "Directory not found.")
 
-    items = []
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int) 
+
+    items_to_display = []
     try:
-        dir_items = []
-        file_items = []
-        for item_name_raw in os.listdir(current_path_abs):
-            details = get_item_details(FILE_SYSTEM_ROOT, current_fs_path_for_os, item_name_raw)
+        all_item_names = os.listdir(current_path_abs)
+        
+        dir_names = []
+        file_names = []
+        for name in all_item_names:
+            if os.path.isdir(os.path.join(current_path_abs, name)):
+                dir_names.append(name)
+            else:
+                file_names.append(name)
+                
+        dir_names.sort(key=str.lower)
+        file_names.sort(key=str.lower)
+        all_sorted_names = dir_names + file_names
+        
+        total_items = len(all_sorted_names)
+        total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
+        
+        if page < 1:
+            page = 1
+        elif page > total_pages:
+            page = total_pages
             
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        names_for_this_page = all_sorted_names[start_idx:end_idx]
+        
+        for item_name in names_for_this_page:
+            details = get_item_details(FILE_SYSTEM_ROOT, current_fs_path_for_os, item_name)
             if details['is_dir']:
                 details['url'] = url_for('browse.browse_directory', subpath=details['relative_path_unquoted'])
                 details['download_url'] = url_for('files.download_folder_zip', folderpath=details['id_path'])
-                dir_items.append(details)
             else:
                 details['download_url'] = url_for('files.download_single_file', filepath=details['id_path'])
-                file_items.append(details)
-        
-        dir_items.sort(key=lambda x: x['name'].lower())
-        file_items.sort(key=lambda x: x['name'].lower())
-        items = dir_items + file_items
+            items_to_display.append(details)
+            
     except OSError as e:
         current_app.logger.error(f"Error listing directory {current_path_abs}: {e}")
         abort(500, "Error reading the directory.")
@@ -129,29 +107,18 @@ def browse_directory(subpath=''):
             parent_path_url = url_for('browse.browse_directory')
 
     return render_template('index.html',
-                           items=items,
+                           items=items_to_display,
                            current_directory_display=display_current_folder_name,
                            current_path_display=display_current_logical_path,
                            current_path_for_forms=path_param_for_forms, 
-                           parent_path_url=parent_path_url)
-
+                           raw_subpath=current_fs_path_for_os,
+                           parent_path_url=parent_path_url,
+                           page=page,
+                           total_pages=total_pages,
+                           total_items=total_items)
 
 @browse_bp.route('/api/list-all-folders-tree')
 def api_list_all_folders_tree():
-    """
-    API endpoint to retrieve a hierarchical tree structure of all discoverable
-    folders (subdirectories) within the configured FILE_SYSTEM_ROOT.
-
-    This is useful for UI elements that need to display a folder tree, such as
-    a navigation pane or a more complex folder selection dialog.
-    It uses the `_build_folder_tree_recursive` helper function.
-
-    :returns: A Flask JSON response containing a list of root-level folder nodes.
-              Each node has 'name', 'path', 'depth', and 'children' (recursively).
-              Returns a JSON error object and HTTP 500 status on failure.
-    :rtype: tuple[werkzeug.wrappers.response.Response, int]
-    """
-    
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     if not os.path.isdir(FILE_SYSTEM_ROOT):
         current_app.logger.error(f"FILE_SYSTEM_ROOT '{FILE_SYSTEM_ROOT}' is not a valid directory.")
@@ -163,3 +130,38 @@ def api_list_all_folders_tree():
     except Exception as e:
         current_app.logger.error(f"Error generating the folder tree to move: {e}")
         return jsonify({"error": "The list of folders could not be retrieved."}), 500
+
+@browse_bp.route('/api/item-info', methods=['POST'])
+def api_item_info():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    data = request.get_json()
+    
+    if not data or 'path' not in data:
+        return jsonify({"success": False, "message": "Datos inválidos."}), 400
+        
+    item_path_segment = data['path']
+    
+    if not is_safe_path(FILE_SYSTEM_ROOT, item_path_segment):
+        return jsonify({"success": False, "message": "Ruta no permitida."}), 403
+        
+    abs_path = os.path.join(FILE_SYSTEM_ROOT, item_path_segment)
+    
+    if not os.path.exists(abs_path):
+        return jsonify({"success": False, "message": "La ruta no existe."}), 404
+        
+    try:
+        if os.path.isdir(abs_path):
+            total_size = 0
+            file_count = 0
+            for dirpath, _, filenames in os.walk(abs_path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if not os.path.islink(fp):
+                        total_size += os.path.getsize(fp)
+                        file_count += 1
+            return jsonify({"success": True, "size": total_size, "file_count": file_count, "is_dir": True})
+        else:
+            return jsonify({"success": True, "size": os.path.getsize(abs_path), "file_count": 1, "is_dir": False})
+    except Exception as e:
+        current_app.logger.error(f"Error calculando tamaño: {e}")
+        return jsonify({"success": False, "message": "Error leyendo el disco duro."}), 500

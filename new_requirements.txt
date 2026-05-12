@@ -1,6 +1,19 @@
 sudo apt install transmission-daemon
 sudo apt install minidlna
 
+#If the hard drive is ntfs
+sudo apt install ntfs-3g
+
+sudo mkdir -p /media/[user_name]/Rojo
+
+sudo nano /etc/fstab
+UUID=9E2EAB292EAAFA03 /media/[user_name]/[disk_name] ntfs-3g defaults,auto,uid=1000,gid=1000,umask=002,big_writes 0 0
+
+sudo mount -a
+
+
+
+
 sudo systemctl stop transmission-daemon
 
 sudo nano /etc/transmission-daemon/settings.json
