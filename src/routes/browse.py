@@ -2,6 +2,7 @@ import os
 import math
 from flask import Blueprint, render_template, url_for, abort, current_app, jsonify, request
 from utils.utilsHandler import get_item_details, is_safe_path
+from urllib.parse import unquote
 
 def _build_folder_tree_recursive(current_path_abs, root_path_abs, current_depth=0):
     folder_tree_nodes = []
@@ -139,7 +140,7 @@ def api_item_info():
     if not data or 'path' not in data:
         return jsonify({"success": False, "message": "Datos inválidos."}), 400
         
-    item_path_segment = data['path']
+    item_path_segment = unquote(data['path'])
     
     if not is_safe_path(FILE_SYSTEM_ROOT, item_path_segment):
         return jsonify({"success": False, "message": "Ruta no permitida."}), 403
