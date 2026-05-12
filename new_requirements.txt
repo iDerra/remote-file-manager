@@ -46,6 +46,7 @@ user=[user_name]
 media_dir= -> media_dir=V,/media/pi/[disk_name]
 friendly_name= -> friendly_name=Raspberry
 inotify=yes -> Uncomment
+notify_interval=60
 
 sudo chown -R [user_name]:[user_name] /var/cache/minidlna
 
