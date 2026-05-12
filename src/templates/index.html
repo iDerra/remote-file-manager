@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Manager - /{{ current_path_display }}</title>
     <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles-modal.css') }}">
 </head>
@@ -24,153 +24,252 @@
     {% endif %}
     {% endwith %}
 
-    {% if parent_path_url %}
-    <div class="navigation-controls">
-        <a href="{{ parent_path_url }}" class="btn btn-secondary back-button">
-            <i class="fas fa-arrow-left icon"></i>
-        </a>
+    <div class="tabs-container">
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="tab-files"><i class="fas fa-folder-open"></i> Gestor de Archivos</button>
+            <button class="tab-btn" data-tab="tab-torrents"><i class="fas fa-download"></i> Descargas Torrent</button>
+            <button class="tab-btn" data-tab="tab-services"><i class="fas fa-server"></i> Servidor Multimedia</button>
+        </div>
     </div>
-    {% endif %}
 
-    <div class="action-forms-container">
-        <div class="action-card">
-            <h3><i class="fas fa-folder-plus icon"></i> Create New Folder</h3>
-            <form action="{{ url_for('actions.create_folder', parent_folder_segment=current_path_for_forms) }}" method="post" class="styled-form">
-                <div class="form-group">
-                    <label for="new_folder_name_input">Folder name:</label>
-                    <input type="text" id="new_folder_name_input" name="new_folder_name" placeholder="E.g: Important Documents" required>
-                </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Folder</button>
-            </form>
-        </div>
-
-        <div class="action-card">
-            <h3><i class="fas fa-file-upload icon"></i> Upload Files</h3>
-            <form id="upload-files-form" action="{{ url_for('files.upload_files', destination_folder_segment=current_path_for_forms) }}" method="post" enctype="multipart/form-data" class="styled-form">
-                <div class="form-group">
-                    <label for="files-upload-input-files">Select files:</label>
-                    <div class="custom-file-input-wrapper">
-                        <input type="file" id="files-upload-input-files" name="files_to_upload" multiple required>
-                        <label for="files-upload-input-files" class="custom-file-label">
-                            <i class="fas fa-file-import"></i> <span class="file-chosen-text">Choose files...</span>
-                        </label>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Files</button>
-            </form>
-        </div>
+    <div class="tabs-content-wrapper">
         
-        <div class="action-card">
-            <h3><i class="fas fa-folder-open icon"></i> Upload Folder</h3>
-            <form id="upload-folder-form" action="{{ url_for('files.upload_files', destination_folder_segment=current_path_for_forms) }}" method="post" enctype="multipart/form-data" class="styled-form">
-                <div class="form-group">
-                    <label for="files-upload-input-folder">Select a folder:</label>
-                    <div class="custom-file-input-wrapper">
-                        <input type="file" id="files-upload-input-folder" name="files_to_upload" multiple required webkitdirectory directory>
-                        <label for="files-upload-input-folder" class="custom-file-label">
-                            <i class="fas fa-folder-plus"></i> <span class="file-chosen-text">Choose folder...</span>
-                        </label>
+        <div id="tab-files" class="tab-content active">
+            {% if parent_path_url %}
+            <div class="navigation-controls">
+                <a href="{{ parent_path_url }}" class="btn btn-secondary back-button">
+                    <i class="fas fa-arrow-left icon"></i>
+                </a>
+            </div>
+            {% endif %}
+
+            <div class="action-forms-container">
+                <div class="action-card">
+                    <h3><i class="fas fa-folder-plus icon"></i> Create New Folder</h3>
+                    <form action="{{ url_for('actions.create_folder', parent_folder_segment=current_path_for_forms) }}" method="post" class="styled-form">
+                        <div class="form-group">
+                            <label for="new_folder_name_input">Folder name:</label>
+                            <input type="text" id="new_folder_name_input" name="new_folder_name" placeholder="E.g: Important Documents" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Folder</button>
+                    </form>
+                </div>
+
+                <div class="action-card">
+                    <h3><i class="fas fa-file-upload icon"></i> Upload Files</h3>
+                    <form id="upload-files-form" action="{{ url_for('files.upload_files', destination_folder_segment=current_path_for_forms) }}" method="post" enctype="multipart/form-data" class="styled-form">
+                        <div class="form-group">
+                            <label for="files-upload-input-files">Select files:</label>
+                            <div class="custom-file-input-wrapper">
+                                <input type="file" id="files-upload-input-files" name="files_to_upload" multiple required>
+                                <label for="files-upload-input-files" class="custom-file-label">
+                                    <i class="fas fa-file-import"></i> <span class="file-chosen-text">Choose files...</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Files</button>
+                    </form>
+                </div>
+                
+                <div class="action-card">
+                    <h3><i class="fas fa-folder-open icon"></i> Upload Folder</h3>
+                    <form id="upload-folder-form" action="{{ url_for('files.upload_files', destination_folder_segment=current_path_for_forms) }}" method="post" enctype="multipart/form-data" class="styled-form">
+                        <div class="form-group">
+                            <label for="files-upload-input-folder">Select a folder:</label>
+                            <div class="custom-file-input-wrapper">
+                                <input type="file" id="files-upload-input-folder" name="files_to_upload" multiple required webkitdirectory directory>
+                                <label for="files-upload-input-folder" class="custom-file-label">
+                                    <i class="fas fa-folder-plus"></i> <span class="file-chosen-text">Choose folder...</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Folder</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="upload-progress-container" class="bulk-actions-container" style="display: none;">
+                <h4>Upload Progress</h4>
+                <div id="upload-progress-area"> <p id="file-count-text" style="margin-top:0; margin-bottom: 5px;"></p>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar-fill">0%</div>
+                    </div>
+                    <p id="upload-status-text" style="margin-top: 5px; margin-bottom: 10px;"></p>
+                    <ul id="individual-file-status" style="list-style-type: none; padding-left: 0; max-height: 150px; overflow-y: auto; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; padding:10px;"></ul>
+                </div>
+            </div>
+
+            <div id="bulk-actions-container" class="bulk-actions-container" style="display:none; margin-bottom: 20px;">
+                <h4>Actions for selected:</h4>
+                <div class="bulk-actions-buttons-container">
+                    <button id="download-selected-zip-btn" class="btn btn-primary" data-download-zip-url="{{ url_for('files.prepare_multiple_files_zip') }}">
+                        <i class="fas fa-file-archive"></i> Download Selected as ZIP
+                    </button>
+                    <button id="move-selected-btn" class="btn btn-primary" style="margin-right: 10px;">
+                        <i class="fas fa-share-square"></i> Move Selected
+                    </button>
+                    <button id="delete-selected-btn" class="btn btn-danger" data-delete-url="{{ url_for('actions.delete_multiple_items') }}">
+                        <i class="fas fa-trash-alt"></i> Delete Selected
+                    </button>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%; text-align: center;"><input type="checkbox" id="select-all-checkbox" title="Select all/none"></th>
+                        <th style="width: 35%;">Name</th>
+                        <th style="width: 10%;">Size</th>
+                        <th style="width: 15%;">Modified</th>
+                        <th style="width: 35%;" class="actions-cell">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="item-checkbox" name="selected_items" value="{{ item.id_path }}" data-name="{{ item.name|e }}">
+                        </td>
+                        <td>
+                            {% if item.is_dir %}
+                                <i class="fas fa-folder icon" style="color: #FFD700;"></i>
+                                <a href="{{ item.url }}">{{ item.name }}</a>
+                            {% else %}
+                                <i class="fas fa-file icon" style="color: #6c757d;"></i>
+                                {{ item.name }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.size is not none %}
+                                {% if item.size < 1024 %}
+                                    <span class="size">{{ item.size }} B</span>
+                                {% elif item.size < 1024*1024 %}
+                                    <span class="size">{{ '%.2f' | format(item.size / 1024) }} KB</span>
+                                {% elif item.size < 1024*1024*1024 %}
+                                    <span class="size">{{ '%.2f' | format(item.size / (1024*1024)) }} MB</span>
+                                {% else %}
+                                    <span class="size">{{ '%.2f' | format(item.size / (1024*1024*1024)) }} GB</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td><span class="modified">{{ item.modified }}</span></td>
+                        <td class="actions-cell">
+                            <a href="{{ item.download_url }}" title="Download {{ item.name|e }}">
+                                <i class="fas {{ 'fa-file-archive' if item.is_dir else 'fa-download' }} icon" style="color: {{ '#e67e22' if item.is_dir else '#2ecc71' }};"></i>
+                            </a>
+                            <form action="{{ url_for('actions.delete_item', item_to_delete_segment=item.id_path) }}" method="post" onsubmit="return confirm('Are you sure you want to delete \'{{ item.name|e }}\'? \n\nTHIS ACTION IS IRREVERSIBLE.');" style="display: inline-block;">
+                                <button type="submit" title="Delete {{ item.name|e }}">
+                                    <i class="fas fa-trash-alt icon" style="color: #dc3545;"></i>
+                                </button>
+                            </form>
+                            <button class="open-move-modal-btn"
+                                    data-item-path="{{ item.id_path }}"
+                                    data-item-name="{{ item.name|e }}"
+                                    title="Move {{ item.name|e }}"
+                                    style="background: none; border: none; padding: 3px 5px; cursor: pointer; font-size: 1em;">
+                                <i class="fas fa-share-square icon" style="color: #007bff;"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 20px; color: #888;">
+                            The directory is empty.
+                            <br><small>You can create a folder or upload files using the forms above.</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div> 
+        
+        <div id="tab-torrents" class="tab-content">
+            <div class="action-forms-container">
+                <div class="action-card" style="flex: 100%;">
+                    <h3><i class="fas fa-magnet icon"></i> Add Torrent</h3>
+                    
+                    <form id="add-torrent-form" class="styled-form" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+                        
+                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                            <label for="torrent_magnet">Magnet Link:</label>
+                            <input type="text" id="torrent_magnet" name="magnet_link" placeholder="Pega el enlace magnet aquí...">
+                        </div>
+                        
+                        <div style="font-weight: bold; padding-bottom: 10px; color: #6c757d;">O</div>
+                        
+                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                            <label for="torrent_file">Torrent File:</label>
+                            <div class="custom-file-input-wrapper">
+                                <input type="file" id="torrent_file" name="torrent_file" accept=".torrent">
+                                <label for="torrent_file" class="custom-file-label">
+                                    <i class="fas fa-file-upload"></i> <span class="file-chosen-text">Select File...</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 0; padding-left: 15px; border-left: 2px solid #dee2e6;">
+                            <label>Save to:</label>
+                            <div style="display: flex; align-items: center; gap: 10px; background-color: #f8f9fa; border: 1px solid #ced4da; border-radius: 4px; padding: 5px 10px;">
+                                <input type="hidden" id="download_path" name="download_path" value="__root__">
+                                
+                                <button type="button" id="open-torrent-folder-btn" class="btn btn-secondary btn-sm" style="white-space: nowrap; padding: 4px 8px;"><i class="fas fa-folder-open"></i> Select Folder</button>
+                                <span id="selected-path-display" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #495057; font-weight: 500;">Root Directory (/)</span>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="submit-torrent-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add</button>
+                    </form>
+                    <div id="torrent-feedback" style="margin-top: 10px; font-weight: bold;"></div>
+                </div>
+            </div>
+
+            <h3 style="max-width: 1200px; margin: 0 auto 15px auto; padding: 0 30px; color: #495057;"><i class="fas fa-list-ul"></i> Active Downloads</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 45%;">Name</th>
+                        <th style="width: 20%;">Progress</th>
+                        <th style="width: 15%;">Speed</th>
+                        <th style="width: 10%;">Status</th>
+                        <th style="width: 10%; text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="torrent-list-body">
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 20px; color: #888;">Loading downloads...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="tab-services" class="tab-content">
+            <div class="action-forms-container">
+                <div class="action-card">
+                    <h3><i class="fas fa-network-wired icon"></i> Share Network (Samba)</h3>
+                    <p>Allows you to view files from Windows/Mac computers and Smart TVs.</p>
+                    <p>Current Status: <span class="service-status status-online">Online</span></p>
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="alert('En desarrollo')"><i class="fas fa-play"></i> Start</button>
+                        <button class="btn btn-secondary" onclick="alert('En desarrollo')"><i class="fas fa-stop"></i> Stop</button>
+                        <button class="btn btn-primary" onclick="alert('En desarrollo')"><i class="fas fa-sync-alt"></i> Restart</button>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Folder</button>
-            </form>
-        </div>
-    </div>
 
-    <div id="upload-progress-container" class="bulk-actions-container" style="display: none;">
-        <h4>Upload Progress</h4>
-        <div id="upload-progress-area"> <p id="file-count-text" style="margin-top:0; margin-bottom: 5px;"></p>
-            <div class="progress-bar-container">
-                <div id="progress-bar" class="progress-bar-fill">0%</div>
+                <div class="action-card">
+                    <h3><i class="fas fa-tv icon"></i> DLNA Server (Smart TV)</h3>
+                    <p>Native multimedia server for automatic movie indexing on televisions.</p>
+                    <p>Current Status: <span id="dlna-status-badge" class="service-status" style="background-color: #e9ecef; color: #495057;">Checking...</span></p>
+                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="controlDLNA('start')"><i class="fas fa-play"></i> Start</button>
+                        <button class="btn btn-secondary" onclick="controlDLNA('stop')"><i class="fas fa-stop"></i> Stop</button>
+                        <button class="btn btn-primary" onclick="controlDLNA('restart')"><i class="fas fa-sync-alt"></i> Restart</button>
+                        <button class="btn btn-danger" style="width: 100%; margin-top: 5px;" onclick="controlDLNA('rescan')"><i class="fas fa-search"></i> Force Scan Media</button>
+                    </div>
+                </div>
             </div>
-            <p id="upload-status-text" style="margin-top: 5px; margin-bottom: 10px;"></p>
-            <ul id="individual-file-status" style="list-style-type: none; padding-left: 0; max-height: 150px; overflow-y: auto; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; padding:10px;"></ul>
         </div>
-    </div>
-
-    <div id="bulk-actions-container" class="bulk-actions-container" style="display:none; margin-bottom: 20px;">
-        <h4>Actions for selected:</h4>
-        <div class="bulk-actions-buttons-container">
-            <button id="download-selected-zip-btn" class="btn btn-primary" data-download-zip-url="{{ url_for('files.prepare_multiple_files_zip') }}">
-                <i class="fas fa-file-archive"></i> Download Selected as ZIP
-            </button>
-            <button id="move-selected-btn" class="btn btn-primary" style="margin-right: 10px;">
-                <i class="fas fa-share-square"></i> Move Selected
-            </button>
-            <button id="delete-selected-btn" class="btn btn-danger" data-delete-url="{{ url_for('actions.delete_multiple_items') }}">
-                <i class="fas fa-trash-alt"></i> Delete Selected
-            </button>
-        </div>
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 5%; text-align: center;"><input type="checkbox" id="select-all-checkbox" title="Select all/none"></th>
-                <th style="width: 35%;">Name</th>
-                <th style="width: 10%;">Size</th>
-                <th style="width: 15%;">Modified</th>
-                <th style="width: 35%;" class="actions-cell">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in items %}
-            <tr>
-                <td style="text-align: center;">
-                    <input type="checkbox" class="item-checkbox" name="selected_items" value="{{ item.id_path }}" data-name="{{ item.name|e }}">
-                </td>
-                <td>
-                    {% if item.is_dir %}
-                        <i class="fas fa-folder icon" style="color: #FFD700;"></i>
-                        <a href="{{ item.url }}">{{ item.name }}</a>
-                    {% else %}
-                        <i class="fas fa-file icon" style="color: #6c757d;"></i>
-                        {{ item.name }}
-                    {% endif %}
-                </td>
-                <td>
-                    {% if item.size is not none %}
-                        {% if item.size < 1024 %}
-                            <span class="size">{{ item.size }} B</span>
-                        {% elif item.size < 1024*1024 %}
-                            <span class="size">{{ '%.2f' | format(item.size / 1024) }} KB</span>
-                        {% elif item.size < 1024*1024*1024 %}
-                            <span class="size">{{ '%.2f' | format(item.size / (1024*1024)) }} MB</span>
-                        {% else %}
-                            <span class="size">{{ '%.2f' | format(item.size / (1024*1024*1024)) }} GB</span>
-                        {% endif %}
-                    {% endif %}
-                </td>
-                <td><span class="modified">{{ item.modified }}</span></td>
-                <td class="actions-cell">
-                    <a href="{{ item.download_url }}" title="Download {{ item.name|e }}">
-                        <i class="fas {{ 'fa-file-archive' if item.is_dir else 'fa-download' }} icon" style="color: {{ '#e67e22' if item.is_dir else '#2ecc71' }};"></i>
-                    </a>
-                    <form action="{{ url_for('actions.delete_item', item_to_delete_segment=item.id_path) }}" method="post" onsubmit="return confirm('Are you sure you want to delete \'{{ item.name|e }}\'? \n\nTHIS ACTION IS IRREVERSIBLE.');" style="display: inline-block;">
-                        <button type="submit" title="Delete {{ item.name|e }}">
-                            <i class="fas fa-trash-alt icon" style="color: #dc3545;"></i>
-                        </button>
-                    </form>
-                    <button class="open-move-modal-btn"
-                            data-item-path="{{ item.id_path }}"
-                            data-item-name="{{ item.name|e }}"
-                            title="Move {{ item.name|e }}"
-                            style="background: none; border: none; padding: 3px 5px; cursor: pointer; font-size: 1em;">
-                        <i class="fas fa-share-square icon" style="color: #007bff;"></i>
-                    </button>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="5" style="text-align: center; padding: 20px; color: #888;">
-                    The directory is empty.
-                    <br><small>You can create a folder or upload files using the forms above.</small>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
+    </div> 
+    
     <div id="move-item-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
@@ -190,7 +289,25 @@
         </div>
     </div>
 
-    <div id="bulk-actions-summary" style="margin-top: 10px;"></div>
+    <div id="torrent-folder-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4>Select Destination</h4>
+                <span class="modal-close-btn" id="close-torrent-folder-btn" title="Close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Choose the folder where the torrent will be downloaded:</p>
+                <div id="torrent-folder-list-container" class="folder-list-container">
+                    <p class="loading-text">Loading folders...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancel-torrent-folder-btn" class="btn btn-secondary">Cancel</button>
+                <button type="button" id="confirm-torrent-folder-btn" class="btn btn-primary" disabled>Accept</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         var listFoldersTreeApiUrl = "{{ url_for('browse.api_list_all_folders_tree') }}";
         var moveMultipleItemsApiUrl = "{{ url_for('actions.move_multiple_items') }}";
@@ -203,9 +320,22 @@
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                button.classList.add('active');
+                const targetTab = document.getElementById(button.getAttribute('data-tab'));
+                if (targetTab) targetTab.classList.add('active');
+            });
+        });
+
         function setupFileInputFeedback(inputId, isFolderInput) {
             const fileInput = document.getElementById(inputId);
-            const wrapper = fileInput.closest('.custom-file-input-wrapper');
+            const wrapper = fileInput ? fileInput.closest('.custom-file-input-wrapper') : null;
             if (!wrapper) return;
             const fileChosenTextSpan = wrapper.querySelector('.custom-file-label .file-chosen-text');
 
@@ -213,22 +343,11 @@
                 fileInput.addEventListener('change', function() {
                     if (this.files.length > 0) {
                         if (isFolderInput) {
-                            let firstFile = this.files[0];
-                            let directoryName = "";
-                            if (firstFile && firstFile.webkitRelativePath) {
-                                directoryName = firstFile.webkitRelativePath.split('/')[0];
-                            }
-                            if (directoryName) {
-                                fileChosenTextSpan.textContent = `Folder: ${directoryName} (${this.files.length} files)`;
-                            } else {
-                                fileChosenTextSpan.textContent = `Folder selected (${this.files.length} files)`;
-                            }
+                            let firstFile = this.files;
+                            let directoryName = firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/') : "Folder";
+                            fileChosenTextSpan.textContent = `Folder: ${directoryName} (${this.files.length} files)`;
                         } else {
-                            if (this.files.length > 1) {
-                                fileChosenTextSpan.textContent = `${this.files.length} files selected`;
-                            } else {
-                                fileChosenTextSpan.textContent = this.files[0].name;
-                            }
+                            fileChosenTextSpan.textContent = this.files.length > 1 ? `${this.files.length} files selected` : this.files.name;
                         }
                     } else {
                         fileChosenTextSpan.textContent = isFolderInput ? 'Choose folder...' : 'Choose files...';
@@ -238,7 +357,283 @@
         }
         setupFileInputFeedback('files-upload-input-files', false);
         setupFileInputFeedback('files-upload-input-folder', true);
+        setupFileInputFeedback('torrent_file', false);
     });
     </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addTorrentForm = document.getElementById('add-torrent-form');
+            const feedbackDiv = document.getElementById('torrent-feedback');
+
+            if (addTorrentForm) {
+                addTorrentForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    feedbackDiv.innerHTML = '<span style="color: blue;">Sending to Transmission...</span>';
+                    
+                    const formData = new FormData(addTorrentForm);
+                    
+                    fetch('/api/torrents/add', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            feedbackDiv.innerHTML = `<span style="color: green;">${data.message}</span>`;
+                            addTorrentForm.reset();
+                            document.querySelector('#torrent_file + label .file-chosen-text').textContent = "Select...";
+                            document.getElementById('download_path').value = '__root__';
+                            document.getElementById('selected-path-display').textContent = 'Root Directory (/)';
+                            updateTorrentList(); 
+                        } else {
+                            feedbackDiv.innerHTML = `<span style="color: red;">${data.message}</span>`;
+                        }
+                    })
+                    .catch(err => {
+                        feedbackDiv.innerHTML = `<span style="color: red;">Network error.</span>`;
+                    });
+                });
+            }
+
+            function updateTorrentList() {
+                if(!document.getElementById('tab-torrents').classList.contains('active')) return;
+
+                fetch('/api/torrents/list')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('torrent-list-body');
+                    if (!data.success) {
+                        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: red;">Error: ${data.message}</td></tr>`;
+                        return;
+                    }
+                    
+                    if (data.torrents.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888;">No active downloads at the moment.</td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = '';
+                    data.torrents.forEach(t => {
+                        let statusColor = '#6c757d';
+                        if(t.status === 'downloading') statusColor = '#007bff';
+                        else if(t.status === 'seeding') statusColor = '#28a745';
+                        else if(t.status === 'stopped') statusColor = '#dc3545';
+
+                        let errorHtml = t.errorString ? `<div style="color: red; font-size: 0.8em; margin-top: 4px;"><i class="fas fa-exclamation-triangle"></i> ${t.errorString}</div>` : '';
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>
+                                    <strong>${t.name}</strong>
+                                    ${errorHtml}
+                                </td>
+                                <td>
+                                    <div class="progress-bar-container" style="height: 15px;">
+                                        <div class="progress-bar-fill" style="width: ${t.progress}%; line-height: 15px; font-size: 0.7em;">${t.progress}%</div>
+                                    </div>
+                                </td>
+                                <td>${t.downloadRate > 0 ? t.downloadRate + ' KB/s' : '-'}</td>
+                                <td><span style="color: ${statusColor}; font-weight: 500;">${t.status}</span></td>
+                                <td style="text-align: center;">
+                                    <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.9em;" onclick="removeTorrent(${t.id})" title="Delete torrent and downloaded data">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                });
+            }
+
+            window.removeTorrent = function(id) {
+                if (confirm('Are you sure you want to delete this torrent and its downloaded data?')) {
+                    fetch('/api/torrents/remove', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ id: id })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateTorrentList();
+                        } else {
+                            alert('Error deleting torrent: ' + data.message);
+                        }
+                    })
+                    .catch(err => {
+                        alert('Network error while trying to delete the torrent.');
+                    });
+                }
+            };
+
+            setInterval(updateTorrentList, 3000);
+            document.querySelector('[data-tab="tab-torrents"]').addEventListener('click', updateTorrentList);
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const openFolderBtn = document.getElementById('open-torrent-folder-btn');
+            const hiddenDownloadPathInput = document.getElementById('download_path');
+            const selectedPathDisplay = document.getElementById('selected-path-display');
+            const folderModal = document.getElementById('torrent-folder-modal');
+            const folderListContainer = document.getElementById('torrent-folder-list-container');
+            const confirmFolderBtn = document.getElementById('confirm-torrent-folder-btn');
+            
+            let selectedTorrentPath = null;
+            let displayFolderName = null;
+
+            function openTorrentModal() {
+                folderModal.style.display = 'block';
+                selectedTorrentPath = null;
+                displayFolderName = null;
+                confirmFolderBtn.disabled = true;
+                folderListContainer.innerHTML = '<p class="loading-text">Loading folders from Raspberry...</p>';
+                
+                fetch(listFoldersTreeApiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        folderListContainer.innerHTML = `<p class="loading-text" style="color: red;">Error: ${data.error}</p>`;
+                        return;
+                    }
+                    folderListContainer.innerHTML = '';
+                    const ul = document.createElement('ul');
+                    ul.classList.add('top-level-folder-list');
+                    const rootFolder = { name: 'Root Directory (/)', path: '__root__', children: data };
+                    ul.appendChild(createSelectableFolderItem(rootFolder, true));
+                    folderListContainer.appendChild(ul);
+                })
+                .catch(err => {
+                    folderListContainer.innerHTML = `<p class="loading-text" style="color: red;">Network error while loading folders.</p>`;
+                });
+            }
+
+            function closeTorrentModal() {
+                folderModal.style.display = 'none';
+            }
+
+            if (openFolderBtn) openFolderBtn.addEventListener('click', openTorrentModal);
+            
+            document.getElementById('close-torrent-folder-btn').addEventListener('click', closeTorrentModal);
+            document.getElementById('cancel-torrent-folder-btn').addEventListener('click', closeTorrentModal);
+
+            confirmFolderBtn.addEventListener('click', () => {
+                if (selectedTorrentPath !== null) {
+                    hiddenDownloadPathInput.value = selectedTorrentPath; 
+                    selectedPathDisplay.textContent = displayFolderName;
+                    closeTorrentModal();
+                }
+            });
+
+            function createSelectableFolderItem(folderData, isRoot = false) {
+                const li = document.createElement('li');
+                li.classList.add('folder-item');
+                
+                const contentWrapper = document.createElement('div');
+                contentWrapper.classList.add('folder-content-wrapper');
+                
+                const toggleIcon = document.createElement('i');
+                toggleIcon.classList.add('fas', 'folder-toggle-icon');
+                if (folderData.children && folderData.children.length > 0) {
+                    toggleIcon.classList.add('fa-caret-right');
+                } else {
+                    toggleIcon.classList.add('no-children');
+                }
+                
+                const icon = document.createElement('i');
+                icon.classList.add('fas', isRoot ? 'fa-hdd' : 'fa-folder', 'folder-icon-tree');
+                
+                const span = document.createElement('span');
+                span.classList.add('folder-name');
+                span.textContent = folderData.name;
+                
+                contentWrapper.appendChild(toggleIcon);
+                contentWrapper.appendChild(icon);
+                contentWrapper.appendChild(span);
+                li.appendChild(contentWrapper);
+                
+                contentWrapper.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('#torrent-folder-list-container li').forEach(el => el.classList.remove('selected'));
+                    li.classList.add('selected');
+                    selectedTorrentPath = folderData.path;
+                    displayFolderName = folderData.name;
+                    confirmFolderBtn.disabled = false;
+                });
+                
+                if (folderData.children && folderData.children.length > 0) {
+                    const subList = document.createElement('ul');
+                    subList.classList.add('subfolder-list');
+                    subList.style.display = 'none';
+                    folderData.children.forEach(child => subList.appendChild(createSelectableFolderItem(child)));
+                    li.appendChild(subList);
+                    
+                    toggleIcon.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isExpanded = subList.style.display === 'block';
+                        subList.style.display = isExpanded ? 'none' : 'block';
+                        toggleIcon.classList.toggle('fa-caret-right', isExpanded);
+                        toggleIcon.classList.toggle('fa-caret-down', !isExpanded);
+                    });
+                }
+                return li;
+            }
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            window.controlDLNA = function(action) {
+                const badge = document.getElementById('dlna-status-badge');
+                badge.textContent = 'Processing...';
+                badge.style.backgroundColor = '#fff3cd';
+                badge.style.color = '#856404';
+
+                fetch(`/api/services/minidlna/${action}`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        checkDLNAStatus();
+                    } else {
+                        alert('Error: ' + data.message);
+                        checkDLNAStatus();
+                    }
+                })
+                .catch(err => {
+                    alert('Error de conexión.');
+                    checkDLNAStatus();
+                });
+            };
+
+            window.checkDLNAStatus = function() {
+                if(!document.getElementById('tab-services').classList.contains('active')) return;
+
+                fetch('/api/services/minidlna/status', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('dlna-status-badge');
+                    if (data.success && data.active) {
+                        badge.textContent = 'Online';
+                        badge.style.backgroundColor = '#d1e7dd';
+                        badge.style.color = '#0f5132';
+                    } else {
+                        badge.textContent = 'Stopped';
+                        badge.style.backgroundColor = '#f8d7da';
+                        badge.style.color = '#842029';
+                    }
+                });
+            };
+
+            document.querySelector('[data-tab="tab-services"]').addEventListener('click', checkDLNAStatus);
+            setTimeout(checkDLNAStatus, 500); 
+        });
+    </script>
+
 </body>
 </html>

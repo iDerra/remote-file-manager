@@ -7,6 +7,8 @@ import config
 from routes.browse import browse_bp
 from routes.files import files_bp
 from routes.actions import actions_bp
+from routes.torrents import torrents_bp
+from routes.media_server import media_server_bp
 
 # --- Configuration ---
 app = Flask(__name__)
@@ -17,6 +19,8 @@ mimetypes.init()
 app.register_blueprint(browse_bp)
 app.register_blueprint(files_bp)
 app.register_blueprint(actions_bp)
+app.register_blueprint(torrents_bp)
+app.register_blueprint(media_server_bp)
 
 if __name__ == '__main__':
     fs_root = app.config['FILE_SYSTEM_ROOT']

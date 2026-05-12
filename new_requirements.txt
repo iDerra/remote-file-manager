@@ -1,0 +1,55 @@
+sudo apt install transmission-daemon
+sudo apt install minidlna
+
+sudo systemctl stop transmission-daemon
+
+sudo nano /etc/transmission-daemon/settings.json
+
+change the following lines:
+
+"alt-speed-enabled": false,
+"cache-size-mb": 64,
+"rpc-authentication-required": false,
+"rpc-whitelist-enabled": false,
+"preallocation": 0,
+"speed-limit-down-enabled": false,
+"speed-limit-up-enabled": false,
+"speed-limit-up": 50,
+"speed-limit-up-enabled": true,
+
+sudo nano /lib/systemd/system/transmission-daemon.service
+
+change User=debian-transmission to User=[user_name]
+
+sudo chown -R [user_name]:[user_name] /etc/transmission-daemon
+sudo chown -R [user_name]:[user_name] /var/lib/transmission-daemon
+
+sudo systemctl daemon-reload
+sudo systemctl start transmission-daemon
+
+sudo nano /etc/minidlna.conf
+
+user=[user_name]
+media_dir= -> media_dir=V,/media/pi/[disk_name]
+friendly_name= -> friendly_name=Raspberry
+inotify=yes -> Uncomment
+
+sudo chown -R [user_name]:[user_name] /var/cache/minidlna
+
+sudo nano /usr/lib/systemd/system/minidlna.service
+
+User=[user_name]
+Group=[user_name]
+
+sudo nano /etc/default/minidlna
+
+User="[user_name]"
+Group="[user_name]"
+
+sudo systemctl daemon-reload
+sudo systemctl start minidlna
+
+sudo visudo
+
+add this line to the end (replace user):
+[user_name] ALL=(ALL) NOPASSWD: /bin/systemctl start minidlna, /bin/systemctl stop minidlna, /bin/systemctl restart minidlna, /bin/systemctl is-active minidlna

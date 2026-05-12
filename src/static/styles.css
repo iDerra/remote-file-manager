@@ -346,3 +346,73 @@ a:hover {
     color: #055160; 
     border-color: #b6effb; 
 }
+
+.tabs-container {
+    max-width: 1200px;
+    margin: 0 auto 20px auto;
+    padding: 0 30px;
+}
+
+.tab-buttons {
+    display: flex;
+    border-bottom: 2px solid #dee2e6;
+    gap: 5px;
+}
+
+.tab-btn {
+    background-color: transparent;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1.05em;
+    font-weight: 500;
+    color: #6c757d;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+}
+
+.tab-btn:hover {
+    color: #007bff;
+    background-color: #f8f9fa;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+}
+
+.tab-btn.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+    background-color: #ffffff;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+}
+
+.tabs-content-wrapper {
+    /* No padding here to let inner elements maintain their own layout */
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeInTab 0.3s ease;
+}
+
+@keyframes fadeInTab {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.service-status {
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.status-online { background-color: #d1e7dd; color: #0f5132; }
+.status-offline { background-color: #f8d7da; color: #842029; }
