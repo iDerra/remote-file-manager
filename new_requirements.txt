@@ -1,5 +1,6 @@
 sudo apt install transmission-daemon
 sudo apt install minidlna
+sudo apt install hdparm
 
 #If the hard drive is ntfs
 sudo apt install ntfs-3g
@@ -12,6 +13,13 @@ UUID=9E2EAB292EAAFA03 /media/[user_name]/[disk_name] ntfs-3g defaults,auto,uid=1
 sudo mount -a
 
 
+sudo nano /etc/hdparm.conf
+
+#add at end:
+/dev/sdb {
+    spindown_time = 120
+}
+
 
 
 sudo systemctl stop transmission-daemon
@@ -22,6 +30,8 @@ change the following lines:
 
 "alt-speed-enabled": false,
 "cache-size-mb": 64,
+"ratio-limit": 0,
+"ratio-limit-enabled": true,
 "rpc-authentication-required": false,
 "rpc-whitelist-enabled": false,
 "preallocation": 0,
