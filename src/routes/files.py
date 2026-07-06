@@ -6,7 +6,7 @@ import tempfile
 import uuid
 from werkzeug.utils import secure_filename
 from utils.utilsHandler import is_safe_path
-from urllib.parse import unquote
+from urllib.parse import unquote # Importante: Traductor de rutas URL
 
 
 files_bp = Blueprint('files', __name__)
@@ -14,13 +14,6 @@ files_bp = Blueprint('files', __name__)
 TEMP_ZIP_FOLDER_NAME = '.tmp_zips'
 
 def get_temp_zip_dir_abs():
-    """
-    Gets the absolute path to the temporary ZIP storage directory and creates it if it doesn't exist.
-
-    :returns: The absolute path to the temporary ZIP directory.
-    :rtype: str
-    """
-
     temp_zip_dir = os.path.join(current_app.static_folder, TEMP_ZIP_FOLDER_NAME)
     os.makedirs(temp_zip_dir, exist_ok=True)
     return temp_zip_dir
@@ -28,23 +21,11 @@ def get_temp_zip_dir_abs():
 
 @files_bp.route('/download_file/<path:filepath>')
 def download_single_file(filepath):
-    """
-    Handles the download of a single specified file.
-
-    It first checks if the requested `filepath` is safe and within the configured
-    FILE_SYSTEM_ROOT. If the path is valid and points to an existing file,
-    it sends the file to the client as an attachment.
-
-    :param filepath: The relative path from the FILE_SYSTEM_ROOT to the file
-                     to be downloaded.
-    :type filepath: str
-    :returns: A Flask response object that sends the file to the client,
-              or an HTTP error (404 or 500) if the file is not found,
-              the path is unsafe, or an error occurs.
-    :rtype: werkzeug.wrappers.response.Response
-    """
-
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    
+    # --- FIX: Descodificamos los espacios y caracteres especiales ---
+    filepath = unquote(filepath)
+    # ----------------------------------------------------------------
     
     if not is_safe_path(FILE_SYSTEM_ROOT, filepath):
         current_app.logger.warning(f"Unsecured download attempt (file): {filepath} path {FILE_SYSTEM_ROOT}")
@@ -70,27 +51,11 @@ def download_single_file(filepath):
 
 @files_bp.route('/download_folder_zip/<path:folderpath>')
 def download_folder_zip(folderpath):
-    """
-    Handles the download of a specified folder as a ZIP archive.
-
-    The function first validates the safety of the `folderpath`. If valid and
-    the path points to an existing directory, it creates a temporary ZIP archive
-    of the folder's contents. This ZIP file is then sent to the client as an
-    attachment. A cleanup function is registered using `@after_this_request`
-    to delete the temporary directory used for ZIP creation after the response
-    has been sent.
-
-    :param folderpath: The relative path from the FILE_SYSTEM_ROOT to the folder
-                       to be downloaded as a ZIP. Can be an empty string to
-                       indicate the root directory itself.
-    :type folderpath: str
-    :returns: A Flask response object that sends the ZIP file to the client,
-              or an HTTP error (404 or 500) if the folder is not found,
-              the path is unsafe, or an error occurs during ZIP creation.
-    :rtype: werkzeug.wrappers.response.Response
-    """
-
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+
+    # --- FIX: Descodificamos los espacios ---
+    folderpath = unquote(folderpath)
+    # ----------------------------------------
 
     if not is_safe_path(FILE_SYSTEM_ROOT, folderpath):
         current_app.logger.warning(f"Unsecured download attempt (folder): {folderpath} path {FILE_SYSTEM_ROOT}")
@@ -156,51 +121,25 @@ def download_folder_zip(folderpath):
 
 @files_bp.route('/upload/<path:destination_folder_segment>', methods=['POST'])
 def upload_files(destination_folder_segment):
-    """
-    Handles file uploads, including individual files and files within a folder structure.
-
-    It receives the base destination folder segment from the URL. The actual files
-    are sent as multipart/form-data. For folder uploads, the client (JavaScript)
-    is expected to send the `relative_path` of each file within the uploaded folder
-    structure in the form data.
-
-    The function performs several checks:
-    - Validates the safety of the base destination path.
-    - Ensures files are part of the request.
-    - Sanitizes the uploaded file/folder names and reconstructs the target path.
-    - Validates the safety of the final calculated path for each item.
-    - Creates necessary subdirectories on the server.
-    - Checks for existing files to prevent overwriting (returns 409 Conflict).
-
-    Returns a JSON response for each file indicating success or failure.
-
-    :param destination_folder_segment: The relative path segment from the file system root
-                                     to the base directory where files should be uploaded.
-                                     '__root__' indicates the base file system root.
-    :type destination_folder_segment: str
-    :returns: A Flask JSON response detailing the outcome of the upload for the specific file.
-              Possible statuses:
-              - 200/201: Success
-              - 400: Bad request (e.g., no file, invalid name)
-              - 403: Forbidden (unsafe path)
-              - 409: Conflict (file already exists)
-              - 500: Server error
-    :rtype: tuple[werkzeug.wrappers.response.Response, int]
-    """
-
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     
+    destination_folder_segment = unquote(destination_folder_segment)
     base_target_relative_path = '' if destination_folder_segment == '__root__' else destination_folder_segment
 
     if not is_safe_path(FILE_SYSTEM_ROOT, base_target_relative_path):
-        return jsonify({"success": False, "message": "Error: The base destination for upload is invalid or not allowed."}), 403
+        return jsonify({"success": False, "message": "Error: Base destination invalid."}), 403
 
     if 'files_to_upload' not in request.files:
-        return jsonify({"success": False, "message": "No file part in the request."}), 400
+        return jsonify({"success": False, "message": "No file part in request."}), 400
 
     file_storage = request.files.get('files_to_upload')
     if not file_storage or not file_storage.filename:
-        return jsonify({"success": False, "message": "No file selected for upload."}), 400
+        return jsonify({"success": False, "message": "No file selected."}), 400
+
+    # Extraemos información de los chunks (si viene)
+    chunk_index = request.form.get('chunk_index', type=int)
+    total_chunks = request.form.get('total_chunks', type=int)
+    is_chunked = chunk_index is not None and total_chunks is not None
             
     item_relative_path_in_upload = request.form.get('relative_path', file_storage.filename)
     sanitized_item_path_parts = []
@@ -210,69 +149,56 @@ def upload_files(destination_folder_segment):
             sanitized_item_path_parts.append(secured_part)
     
     if not sanitized_item_path_parts:
-        return jsonify({"success": False, "filename": file_storage.filename, "message": "Invalid file or folder name after sanitization."}), 400
+        return jsonify({"success": False, "message": "Invalid filename."}), 400
     
     filename_secured = sanitized_item_path_parts[-1]
     sub_directories_in_upload = sanitized_item_path_parts[:-1]
 
-    final_item_relative_dir_on_server = base_target_relative_path
+    final_item_relative_dir = base_target_relative_path
     if sub_directories_in_upload:
-        final_item_relative_dir_on_server = os.path.join(base_target_relative_path, *sub_directories_in_upload)
+        final_item_relative_dir = os.path.join(base_target_relative_path, *sub_directories_in_upload)
 
-    if not is_safe_path(FILE_SYSTEM_ROOT, final_item_relative_dir_on_server):
-        return jsonify({"success": False, "filename": file_storage.filename, "message": f"Error: Calculated path '{final_item_relative_dir_on_server}' is invalid or not allowed."}), 403
+    if not is_safe_path(FILE_SYSTEM_ROOT, final_item_relative_dir):
+        return jsonify({"success": False, "message": "Calculated path invalid."}), 403
 
-    target_item_directory_abs = os.path.join(FILE_SYSTEM_ROOT, final_item_relative_dir_on_server)
+    target_item_directory_abs = os.path.join(FILE_SYSTEM_ROOT, final_item_relative_dir)
 
     try:
         os.makedirs(target_item_directory_abs, exist_ok=True)
     except OSError as e:
-        current_app.logger.error(f"Error creating directory '{target_item_directory_abs}': {e}")
-        return jsonify({"success": False, "filename": filename_secured, "message": f"Error creating target directory on server: {e}"}), 500
+        return jsonify({"success": False, "message": f"Error creating dir: {e}"}), 500
 
     destination_file_path_abs = os.path.join(target_item_directory_abs, filename_secured)
     
-    if os.path.exists(destination_file_path_abs):
-        return jsonify({"success": False, "filename": item_relative_path_in_upload, "message": "File already exists at the destination. Skipped."}), 409 
-    
-    try:
-        file_storage.save(destination_file_path_abs)
-        return jsonify({"success": True, "filename": item_relative_path_in_upload, "message": "File uploaded successfully."}), 200
-    except Exception as e:
-        current_app.logger.error(f"Error saving file '{item_relative_path_in_upload}' to '{destination_file_path_abs}': {e}")
-        return jsonify({"success": False, "filename": item_relative_path_in_upload, "message": f"Error saving the file on server."}), 500
+    # Comprobación de existencia (Solo si es un archivo normal o el primer chunk)
+    if os.path.exists(destination_file_path_abs) and (not is_chunked or chunk_index == 0):
+        return jsonify({"success": False, "message": "File already exists. Skipped."}), 409 
 
+    try:
+        if is_chunked:
+            # Modo Chunk: Abrimos en modo "append binary" ('ab') para añadir al final
+            with open(destination_file_path_abs, 'ab') as f:
+                f.write(file_storage.read())
+            
+            # Si era el último chunk, mandamos éxito total
+            if chunk_index == total_chunks - 1:
+                return jsonify({"success": True, "message": "File uploaded successfully."}), 200
+            else:
+                # Si faltan chunks, avisamos de que este trozo se subió bien
+                return jsonify({"success": True, "message": "Chunk uploaded."}), 206
+        else:
+            # Modo Normal (archivos pequeños sin chunks)
+            file_storage.save(destination_file_path_abs)
+            return jsonify({"success": True, "message": "File uploaded successfully."}), 200
+            
+    except Exception as e:
+        current_app.logger.error(f"Upload error: {e}")
+        return jsonify({"success": False, "message": "Error saving file."}), 500
+        
 
 @files_bp.route('/api/prepare_multiple_files_zip', methods=['POST'])
 def prepare_multiple_files_zip():
-    """
-    API endpoint to prepare a ZIP archive containing multiple specified files and folders.
-
-    Expects a JSON payload with:
-    - `items_to_download` (list): A list of URL-encoded relative paths of items to include.
-    - `zip_name` (str, optional): A suggested name for the output ZIP file.
-
-    The process involves:
-    1. Validating input and sanitizing the suggested ZIP name.
-    2. Creating temporary staging and ZIP creation directories.
-    3. For each specified item:
-        - Decoding and validating its path.
-        - Copying the item (file or folder tree) into the staging directory,
-          maintaining its relative path structure.
-    4. If any valid items were processed, creating a ZIP archive from the staging directory.
-    5. Moving the created ZIP to a designated temporary ZIP storage area (within static folder).
-    6. Returning a JSON response with a download URL for the prepared ZIP.
-
-    Temporary directories are cleaned up in a finally block. The actual ZIP file in
-    the static temporary storage is cleaned up by the `cleanup_prepared_zip`
-    `after_request` handler when it's downloaded via `download_prepared_zip_route`.
-
-    :returns: A Flask JSON response:
-              - On success (200): `{"success": True, "download_url": "...", "zip_display_name": "..."}`
-              - On failure (400 or 500): `{"success": False, "message": "Error details"}`
-    :rtype: tuple[werkzeug.wrappers.response.Response, int]
-    """
-
+    # ... Esta función ya la procesamos bien en el bucle interior con el unquote
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     data = request.get_json()
 
@@ -335,7 +261,7 @@ def prepare_multiple_files_zip():
             flash("No valid files or folders were found to include in the ZIP.", "warning")
             return jsonify({"success": False, "message": "No valid files or folders were found to include in the ZIP."}), 400
 
-        archive_base_name_in_temp = os.path.join(zip_creation_temp_dir, os.path.splitext(zip_display_name)[0])
+        archive_base_name_in_temp = os.path.join(zip_creation_temp_dir, os.path.splitext(zip_display_name))
         
         created_archive_path_abs = shutil.make_archive(
             base_name=archive_base_name_in_temp,
@@ -369,26 +295,6 @@ def prepare_multiple_files_zip():
 
 @files_bp.route('/download_prepared_zip/<path:zip_file_on_server>')
 def download_prepared_zip_route(zip_file_on_server):
-    """
-    Serves a previously prepared ZIP file from the temporary ZIP storage.
-
-    This route is typically called by the client after
-    `/api/prepare_multiple_files_zip` returns a success response with a
-    download URL pointing here. The `zip_file_on_server` is the unique,
-    server-generated filename of the ZIP.
-
-    The actual cleanup of the ZIP file from the server's temporary storage
-    is handled by the `cleanup_prepared_zip` `after_request` handler.
-
-    :param zip_file_on_server: The unique filename (basename) of the ZIP file
-                               as it exists in the temporary ZIP storage directory.
-    :type zip_file_on_server: str
-    :returns: A Flask response object that sends the ZIP file to the client,
-              or redirects to the browse view with an error/warning flash
-              if the file is not found or an error occurs.
-    :rtype: werkzeug.wrappers.response.Response
-    """
-
     temp_zip_dir_abs = get_temp_zip_dir_abs()
     safe_zip_filename = secure_filename(os.path.basename(zip_file_on_server))
     file_path_abs = os.path.join(temp_zip_dir_abs, safe_zip_filename)
@@ -408,21 +314,6 @@ def download_prepared_zip_route(zip_file_on_server):
 
 @files_bp.after_request
 def cleanup_prepared_zip(response):
-    """
-    Cleans up (deletes) a temporary ZIP file after it has been successfully sent.
-
-    This function is registered to run after every request within the `files_bp` blueprint.
-    It specifically targets requests to the 'files.download_prepared_zip_route' endpoint.
-    If the request was to download a prepared ZIP and the response status indicates
-    a successful file transmission (e.g., 200 OK), it attempts to delete the
-    corresponding ZIP file from the temporary storage.
-
-    :param response: The response object that is about to be sent to the client.
-    :type response: werkzeug.wrappers.response.Response
-    :returns: The (potentially modified) response object.
-    :rtype: werkzeug.wrappers.response.Response
-    """
-
     if request.endpoint == 'files.download_prepared_zip_route':
         if 200 <= response.status_code < 300:
             if 'zip_file_on_server' in request.view_args:
