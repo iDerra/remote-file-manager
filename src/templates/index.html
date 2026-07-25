@@ -135,8 +135,13 @@
                                 <i class="fas fa-folder icon" style="color: #FFD700;"></i>
                                 <a href="{{ item.url }}">{{ item.name }}</a>
                             {% else %}
-                                <i class="fas fa-file icon" style="color: #6c757d;"></i>
-                                {{ item.name }}
+                                {% if item.is_video %}
+                                    <i class="fas fa-file-video icon" style="color: #9b59b6;"></i>
+                                    <a href="javascript:void(0);" onclick="toggleVideoDetails('{{ loop.index }}', '{{ item.id_path }}', '{{ item.stream_url }}')">{{ item.name }}</a>
+                                {% else %}
+                                    <i class="fas fa-file icon" style="color: #6c757d;"></i>
+                                    {{ item.name }}
+                                {% endif %}
                             {% endif %}
                         </td>
                         <td>
@@ -177,6 +182,24 @@
                             </button>
                         </td>
                     </tr>
+                    {% if item.is_video %}
+                    <tr id="video-details-{{ loop.index }}" class="video-details-row" style="display: none;">
+                        <td colspan="5">
+                            <div class="video-details-container">
+                                <div class="video-thumbnail" onclick="openVideoPlayer('{{ item.stream_url }}', '{{ item.id_path }}', '{{ item.name|e }}')">
+                                    <canvas id="video-canvas-{{ loop.index }}" width="320" height="180"></canvas>
+                                    <i class="fas fa-play-circle play-overlay"></i>
+                                </div>
+                                <div class="video-info">
+                                    <h4>{{ item.name }}</h4>
+                                    <p><i class="fas fa-clock"></i> <strong>Duration:</strong> <span id="video-duration-{{ loop.index }}">Loading...</span></p>
+                                    <p><i class="fas fa-eye"></i> <strong>Status:</strong> <span id="video-status-{{ loop.index }}">Not viewed</span></p>
+                                    <p><i class="fas fa-step-forward"></i> <strong>Progress Saved:</strong> <span id="video-progress-{{ loop.index }}">00:00</span></p>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% else %}
                     <tr>
                         <td colspan="5" style="text-align: center; padding: 20px; color: #888;">
@@ -337,6 +360,20 @@
             <div class="modal-footer">
                 <button type="button" id="cancel-torrent-folder-btn" class="btn btn-secondary">Cancel</button>
                 <button type="button" id="confirm-torrent-folder-btn" class="btn btn-primary" disabled>Accept</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="video-player-modal" class="modal" style="display: none; z-index: 9999;">
+        <div class="modal-content" style="max-width: 900px; width: 95%; background-color: #1a1a1a; border: 1px solid #333;">
+            <div class="modal-header" style="background-color: #111; border-bottom: 1px solid #333; color: white;">
+                <h4><i class="fas fa-film"></i> <span id="video-modal-title" style="margin-left: 10px;"></span></h4>
+                <span class="modal-close-btn" id="close-video-player-btn" title="Close" style="color: white;">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 0; background: #000; text-align: center; display: flex; align-items: center; justify-content: center;">
+                <video id="main-video-player" controls crossorigin="anonymous" preload="metadata" style="width: 100%; max-height: 75vh; outline: none; background: #000;">
+                    Your browser does not support the HTML5 video element.
+                </video>
             </div>
         </div>
     </div>
@@ -702,5 +739,179 @@
             });
         };
     </script>
+
+    <script>
+        function getVideoData(idPath) {
+            const data = localStorage.getItem('video_data_' + idPath);
+            return data ? JSON.parse(data) : { currentTime: 0, watched: false, duration: 0 };
+        }
+
+        function saveVideoData(idPath, data) {
+            localStorage.setItem('video_data_' + idPath, JSON.stringify(data));
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "00:00";
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function toggleVideoDetails(index, idPath, streamUrl) {
+            const detailsRow = document.getElementById('video-details-' + index);
+            
+            if (detailsRow.style.display === 'none') {
+                detailsRow.style.display = 'table-row';
+                
+                const data = getVideoData(idPath);
+                
+                const statusHtml = data.watched ? '<span style="color:#28a745; font-weight:bold;"><i class="fas fa-check-double"></i> Visto</span>' : 'No visto';
+                document.getElementById('video-status-' + index).innerHTML = statusHtml;
+                document.getElementById('video-progress-' + index).innerText = formatTime(data.currentTime);
+                if (data.duration > 0) {
+                    document.getElementById('video-duration-' + index).innerText = formatTime(data.duration);
+                }
+
+                const canvas = document.getElementById('video-canvas-' + index);
+                if (canvas.getAttribute('data-loaded') === 'true') return; // Miniatura ya creada
+
+                const video = document.createElement('video');
+                video.src = streamUrl;
+                video.crossOrigin = 'anonymous';
+                video.preload = 'metadata';
+                video.muted = true;
+                
+                video.addEventListener('loadedmetadata', function() {
+                    if (!data.duration) {
+                        data.duration = video.duration;
+                        saveVideoData(idPath, data);
+                        document.getElementById('video-duration-' + index).innerText = formatTime(video.duration);
+                    }
+                    
+                    let targetTime = data.currentTime;
+                    if (targetTime <= 0 || targetTime >= video.duration - 2) {
+                        targetTime = Math.min(60, video.duration / 2);
+                    }
+                    video.currentTime = targetTime;
+                });
+
+                video.addEventListener('seeked', function() {
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    canvas.setAttribute('data-loaded', 'true');
+                    video.removeAttribute('src'); 
+                    video.load();
+                });
+            } else {
+                detailsRow.style.display = 'none';
+            }
+        }
+
+        let currentPlayingVideoPath = null;
+        let currentPlayingIndex = null; 
+
+        function openVideoPlayer(streamUrl, idPath, title) {
+            const modal = document.getElementById('video-player-modal');
+            const player = document.getElementById('main-video-player');
+            const titleSpan = document.getElementById('video-modal-title');
+            
+            currentPlayingVideoPath = idPath;
+            
+            document.querySelectorAll('.video-details-row').forEach(row => {
+                if (row.innerHTML.includes(idPath)) {
+                    currentPlayingIndex = row.id.replace('video-details-', '');
+                }
+            });
+
+            titleSpan.innerText = title;
+            
+            player.innerHTML = 'Your browser does not support the HTML5 video element.';
+            player.src = streamUrl;
+            
+            fetch(`/api/video_subtitles/${idPath}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.subtitles.length > 0) {
+                        data.subtitles.forEach((sub) => {
+                            const track = document.createElement('track');
+                            track.kind = 'subtitles';
+                            track.label = sub.label;
+                            track.srclang = sub.language;
+                            track.src = `/stream_subtitle/${idPath}/${sub.index}`;
+                            player.appendChild(track);
+                        });
+                    }
+                })
+                .catch(err => console.error("Error cargando subtítulos:", err));
+
+            const data = getVideoData(idPath);
+            if (data.currentTime > 0 && !data.watched) {
+                player.currentTime = data.currentTime;
+            }
+
+            modal.style.display = 'block';
+            player.play();
+        }
+
+        const mainPlayer = document.getElementById('main-video-player');
+        mainPlayer.addEventListener('timeupdate', function(e) {
+            if (!currentPlayingVideoPath) return;
+            const player = e.target;
+            
+            if (player.duration) {
+                const watched = (player.currentTime / player.duration) > 0.90;
+                
+                const data = {
+                    currentTime: player.currentTime,
+                    duration: player.duration,
+                    watched: watched
+                };
+                
+                if (Math.floor(player.currentTime) % 2 === 0) { 
+                    saveVideoData(currentPlayingVideoPath, data);
+                }
+            }
+        });
+
+        function closeVideoPlayer() {
+            const modal = document.getElementById('video-player-modal');
+            
+            if (currentPlayingVideoPath) {
+                const data = {
+                    currentTime: mainPlayer.currentTime,
+                    duration: mainPlayer.duration,
+                    watched: (mainPlayer.currentTime / mainPlayer.duration) > 0.90
+                };
+                saveVideoData(currentPlayingVideoPath, data);
+
+                if (currentPlayingIndex) {
+                    const statusHtml = data.watched ? '<span style="color:#28a745; font-weight:bold;"><i class="fas fa-check-double"></i> Visto</span>' : 'No visto';
+                    const statusEl = document.getElementById('video-status-' + currentPlayingIndex);
+                    const progressEl = document.getElementById('video-progress-' + currentPlayingIndex);
+                    
+                    if (statusEl) statusEl.innerHTML = statusHtml;
+                    if (progressEl) progressEl.innerText = formatTime(data.currentTime);
+                }
+            }
+
+            mainPlayer.pause();
+            mainPlayer.removeAttribute('src'); 
+            mainPlayer.load();
+            modal.style.display = 'none';
+            currentPlayingVideoPath = null;
+            currentPlayingIndex = null;
+        }
+
+        document.getElementById('close-video-player-btn').addEventListener('click', closeVideoPlayer);
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('video-player-modal');
+            if (event.target === modal) {
+                closeVideoPlayer();
+            }
+        });
+    </script>
+
 </body>
 </html>

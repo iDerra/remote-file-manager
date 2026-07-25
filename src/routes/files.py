@@ -1,9 +1,12 @@
 from flask import (Blueprint, send_from_directory, abort, current_app, send_file, 
-                   after_this_request, request, flash, redirect, url_for, jsonify)
+                   after_this_request, request, flash, redirect, url_for, jsonify, Response)
 import os
 import shutil
 import tempfile
 import uuid
+import subprocess
+import json
+
 from werkzeug.utils import secure_filename
 from utils.utilsHandler import is_safe_path
 from urllib.parse import unquote # Importante: Traductor de rutas URL
@@ -332,3 +335,76 @@ def cleanup_prepared_zip(response):
             else:
                 current_app.logger.warning("Cleanup function called for download_prepared_zip_route but 'zip_file_on_server' not in view_args.")
     return response
+
+@files_bp.route('/stream_file/<path:filepath>')
+def stream_file(filepath):
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    filepath = unquote(filepath)
+    
+    if not is_safe_path(FILE_SYSTEM_ROOT, filepath):
+        abort(404, "File not found or not allowed.")
+        
+    absolute_file_path = os.path.join(FILE_SYSTEM_ROOT, filepath)
+    
+    if not os.path.isfile(absolute_file_path):
+        abort(404, "The requested resource is not a valid file.")
+        
+    directory = os.path.dirname(absolute_file_path)
+    filename = os.path.basename(absolute_file_path)
+    
+    return send_from_directory(directory, filename, as_attachment=False)
+
+@files_bp.route('/api/video_subtitles/<path:filepath>')
+def video_subtitles_info(filepath):
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    filepath = unquote(filepath)
+    abs_path = os.path.join(FILE_SYSTEM_ROOT, filepath)
+    
+    if not os.path.isfile(abs_path):
+        return jsonify({"success": False, "subtitles": []})
+        
+    try:
+        cmd = [
+            'ffprobe', '-v', 'error', 
+            '-select_streams', 's', 
+            '-show_entries', 'stream=index:stream_tags=language,title', 
+            '-of', 'json', abs_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        data = json.loads(result.stdout)
+        
+        subs = []
+        for stream in data.get('streams', []):
+            tags = stream.get('tags', {})
+            lang = tags.get('language', 'und')
+            title = tags.get('title', f'Pista {stream.get("index")}')
+            subs.append({
+                'index': stream.get('index'),
+                'language': lang,
+                'label': f"{title} ({lang})"
+            })
+        return jsonify({"success": True, "subtitles": subs})
+    except Exception as e:
+        current_app.logger.error(f"Error reading subtitles with ffprobe: {e}")
+        return jsonify({"success": False, "subtitles": []})
+
+@files_bp.route('/stream_subtitle/<path:filepath>/<int:stream_index>')
+def stream_subtitle(filepath, stream_index):
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    filepath = unquote(filepath)
+    abs_path = os.path.join(FILE_SYSTEM_ROOT, filepath)
+    
+    if not os.path.isfile(abs_path):
+        abort(404)
+        
+    def generate():
+        cmd = [
+            'ffmpeg', '-v', 'error', '-i', abs_path,
+            '-map', f'0:{stream_index}',
+            '-f', 'webvtt', '-'
+        ]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        for chunk in iter(lambda: process.stdout.read(4096), b''):
+            yield chunk
+            
+    return Response(generate(), mimetype='text/vtt')

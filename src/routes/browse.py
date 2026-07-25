@@ -91,6 +91,10 @@ def browse_directory(subpath=''):
                 details['download_url'] = url_for('files.download_folder_zip', folderpath=details['id_path'])
             else:
                 details['download_url'] = url_for('files.download_single_file', filepath=details['id_path'])
+                
+                if details.get('is_video'):
+                    details['stream_url'] = url_for('files.stream_file', filepath=details['id_path'])
+                    
             items_to_display.append(details)
             
     except OSError as e:

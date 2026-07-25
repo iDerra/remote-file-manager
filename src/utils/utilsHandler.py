@@ -2,6 +2,7 @@ import os
 from urllib.parse import quote
 from datetime import datetime
 
+VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.ogg', '.flv', '.m4v'}
 
 def get_folder_size(folder_path_abs):
     """
@@ -60,6 +61,7 @@ def get_item_details(fs_root_path, parent_relative_path, item_name):
         'id_path': id_path_quoted,
         'relative_path_unquoted': item_relative_path_to_root,
         'is_dir': False,
+        'is_video': False,
         'size': None,
         'modified': 'N/A'
     }
@@ -75,7 +77,11 @@ def get_item_details(fs_root_path, parent_relative_path, item_name):
         if details['is_dir']:
             details['size'] = None 
         else:
-            details['size'] = stat_info.st_size 
+            details['size'] = stat_info.st_size
+            
+            _, ext = os.path.splitext(item_name)
+            if ext.lower() in VIDEO_EXTENSIONS:
+                details['is_video'] = True
 
         mod_time = datetime.fromtimestamp(stat_info.st_mtime)
         details['modified'] = mod_time.strftime('%Y-%m-%d %H:%M:%S')
