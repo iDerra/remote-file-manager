@@ -29,6 +29,7 @@
             <button class="tab-btn active" data-tab="tab-files"><i class="fas fa-folder-open"></i> Gestor de Archivos</button>
             <button class="tab-btn" data-tab="tab-torrents"><i class="fas fa-download"></i> Descargas Torrent</button>
             <button class="tab-btn" data-tab="tab-services"><i class="fas fa-server"></i> Servidor Multimedia</button>
+            <button class="tab-btn" data-tab="tab-disk"><i class="fas fa-hdd"></i> Info del Disco</button>
         </div>
     </div>
 
@@ -324,6 +325,69 @@
                 </div>
             </div>
         </div>
+
+        <div id="tab-disk" class="tab-content">
+            <div class="action-forms-container">
+                <div class="action-card" style="flex: 100%; max-width: 700px; margin: 0 auto;">
+                    <h3><i class="fas fa-chart-pie icon"></i> Estado del Almacenamiento</h3>
+                    
+                    <div id="disk-info-content" style="text-align: center; padding: 30px 0;">
+                        <p class="loading-text" style="color: #6c757d;"><i class="fas fa-spinner fa-spin"></i> Analizando disco...</p>
+                    </div>
+                    
+                    <div id="disk-info-data" style="display: none; padding: 10px 20px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1em; font-weight: 500; color: #495057;">
+                            <span id="disk-used-text"><i class="fas fa-database" style="color: #007bff;"></i> Usado: 0 GB</span>
+                            <span id="disk-free-text"><i class="fas fa-check-circle" style="color: #28a745;"></i> Libre: 0 GB</span>
+                        </div>
+                        
+                        <div class="progress-bar-container" style="height: 30px; margin-bottom: 20px; background-color: #e9ecef; border-radius: 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                            <div id="disk-progress-bar" class="progress-bar-fill" style="width: 0%; line-height: 30px; background-color: #007bff; font-size: 1em; font-weight: bold; color: white; transition: width 0.8s ease-in-out;">0%</div>
+                        </div>
+                        
+                        <div style="text-align: center; color: #6c757d; border-top: 1px solid #e9ecef; padding-top: 15px; margin-bottom: 20px;">
+                            <p style="margin: 0; font-size: 1.05em;"><strong>Capacidad Total:</strong> <span id="disk-total-text">0 GB</span></p>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; text-align: left; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6;">
+                            
+                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase; font-weight: bold;"><i class="fas fa-microchip"></i> Dispositivo</div>
+                                <div style="color: #212529; font-weight: 500; margin-top: 8px; font-size: 1.1em;">
+                                    <span id="hw-device">-</span> <span id="hw-fs" style="font-size: 0.8em; background: #e9ecef; padding: 3px 6px; border-radius: 4px; margin-left: 5px; color: #495057;">-</span>
+                                </div>
+                                <div style="font-size: 0.8em; color: #888; margin-top: 6px; line-height: 1.3;">
+                                    Ruta física y formato del sistema de archivos (FUSEBLK equivale a NTFS).
+                                </div>
+                            </div>
+
+                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase; font-weight: bold;"><i class="fas fa-thermometer-half"></i> Salud S.M.A.R.T.</div>
+                                <div style="color: #212529; font-weight: 500; margin-top: 8px; font-size: 1.1em;">
+                                    <span id="hw-health">-</span>
+                                    <span id="hw-temp" style="margin-left: 10px; font-weight: bold;">-</span>
+                                </div>
+                                <div style="font-size: 0.8em; color: #888; margin-top: 6px; line-height: 1.3;">
+                                    Autodiagnóstico del disco. Lo ideal es mantener la temperatura por debajo de los 50 °C.
+                                </div>
+                            </div>
+
+                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase; font-weight: bold;"><i class="fas fa-bolt"></i> Energía del Motor</div>
+                                <div style="color: #212529; font-weight: 500; margin-top: 8px; font-size: 1.1em;">
+                                    <span id="hw-power">-</span>
+                                </div>
+                                <div style="font-size: 0.8em; color: #888; margin-top: 6px; line-height: 1.3;">
+                                    Indica si los platos están girando. A menudo es "Desconocido" por limitaciones de las carcasas USB.
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div> 
     
     <div id="move-item-modal" class="modal" style="display: none;">
@@ -412,13 +476,10 @@
                 fileInput.addEventListener('change', function() {
                     if (this.files.length > 0) {
                         if (isFolderInput) {
-                            // CORRECCIÓN: Accedemos a this.files[0] en lugar de this.files
                             let firstFile = this.files[0]; 
-                            // Extraemos el nombre de la carpeta raíz
                             let directoryName = firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/')[0] : "Carpeta";
                             fileChosenTextSpan.textContent = `Carpeta: ${directoryName} (${this.files.length} archivos)`;
                         } else {
-                            // CORRECCIÓN: Accedemos a this.files[0].name en lugar de this.files.name
                             fileChosenTextSpan.textContent = this.files.length > 1 ? `${this.files.length} archivos seleccionados` : this.files[0].name;
                         }
                     } else {
@@ -778,7 +839,7 @@
                 }
 
                 const canvas = document.getElementById('video-canvas-' + index);
-                if (canvas.getAttribute('data-loaded') === 'true') return; // Miniatura ya creada
+                if (canvas.getAttribute('data-loaded') === 'true') return; 
 
                 const video = document.createElement('video');
                 video.src = streamUrl;
@@ -912,6 +973,89 @@
             const modal = document.getElementById('video-player-modal');
             if (event.target === modal) {
                 closeVideoPlayer();
+            }
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const diskTabBtn = document.querySelector('[data-tab="tab-disk"]');
+            let diskDataLoaded = false;
+            
+            function formatBytesToGB(bytes) {
+                return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+            }
+
+            function loadDiskInfo() {
+                if (diskDataLoaded) return; 
+                
+                fetch('/api/disk-info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('disk-info-content').style.display = 'none';
+                        document.getElementById('disk-info-data').style.display = 'block';
+                        
+                        document.getElementById('disk-total-text').textContent = formatBytesToGB(data.total);
+                        document.getElementById('disk-used-text').innerHTML = `<i class="fas fa-database" style="color: #007bff;"></i> Usado: ${formatBytesToGB(data.used)}`;
+                        document.getElementById('disk-free-text').innerHTML = `<i class="fas fa-check-circle" style="color: #28a745;"></i> Libre: ${formatBytesToGB(data.free)}`;
+                        
+                        const progressBar = document.getElementById('disk-progress-bar');
+                        progressBar.style.width = data.percent + '%';
+                        progressBar.textContent = data.percent + '%';
+                        
+                        if (data.percent >= 90) {
+                            progressBar.style.backgroundColor = '#dc3545'; 
+                        } else if (data.percent >= 75) {
+                            progressBar.style.backgroundColor = '#ffc107'; 
+                            progressBar.style.color = '#343a40'; 
+                        } else {
+                            progressBar.style.backgroundColor = '#007bff'; 
+                        }
+
+                        document.getElementById('hw-device').textContent = data.device;
+                        document.getElementById('hw-fs').textContent = data.fs_type;
+                        document.getElementById('hw-power').textContent = data.power_status;
+                        
+                        const healthSpan = document.getElementById('hw-health');
+                        healthSpan.textContent = data.health;
+                        if (data.health === "Correcto") {
+                            healthSpan.innerHTML = `<i class="fas fa-check" style="color: #28a745;"></i> Correcto`;
+                            healthSpan.style.color = '#28a745';
+                        } else if (data.health === "Riesgo de fallo") {
+                            healthSpan.innerHTML = `<i class="fas fa-times" style="color: #dc3545;"></i> Riesgo`;
+                            healthSpan.style.color = '#dc3545';
+                        }
+
+                        const tempSpan = document.getElementById('hw-temp');
+                        tempSpan.textContent = data.temperature;
+                        const tempValue = parseInt(data.temperature); 
+                        
+                        if (!isNaN(tempValue)) {
+                            if (tempValue < 40) {
+                                tempSpan.style.color = '#28a745'; 
+                            } else if (tempValue >= 40 && tempValue < 50) {
+                                tempSpan.style.color = '#fd7e14'; 
+                            } else {
+                                tempSpan.style.color = '#dc3545'; 
+                            }
+                        } else {
+                            tempSpan.style.color = '#6c757d'; 
+                        }
+                        
+                        diskDataLoaded = true;
+
+                    } else {
+                        document.getElementById('disk-info-content').innerHTML = `<p style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-triangle"></i> Error: ${data.message}</p>`;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('disk-info-content').innerHTML = `<p style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-triangle"></i> Error de red al consultar el disco.</p>`;
+                });
+            }
+
+            if (diskTabBtn) {
+                diskTabBtn.addEventListener('click', loadDiskInfo);
             }
         });
     </script>

@@ -1,5 +1,8 @@
 import os
 import math
+import shutil
+import subprocess
+import re
 from flask import Blueprint, render_template, url_for, abort, current_app, jsonify, request
 from utils.utilsHandler import get_item_details, is_safe_path
 from urllib.parse import unquote
@@ -170,3 +173,71 @@ def api_item_info():
     except Exception as e:
         current_app.logger.error(f"Error calculando tamaño: {e}")
         return jsonify({"success": False, "message": "Error leyendo el disco duro."}), 500
+
+@browse_bp.route('/api/disk-info', methods=['GET'])
+def api_disk_info():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    try:
+        total, used, free = shutil.disk_usage(FILE_SYSTEM_ROOT)
+        percent = round((used / total) * 100, 1) if total > 0 else 0
+        
+        device_path = "Desconocido"
+        fs_type = "Desconocido"
+        raw_device = ""
+        
+        df_result = subprocess.run(['df', '-T', FILE_SYSTEM_ROOT], capture_output=True, text=True)
+        if df_result.returncode == 0:
+            lines = df_result.stdout.strip().split('\n')
+            if len(lines) > 1:
+                parts = lines[1].split()
+                device_path = parts[0]  
+                fs_type = parts[1]      
+                
+                match = re.match(r'(/dev/sd[a-z]|/dev/nvme\d+n\d+|/dev/mmcblk\d+)', device_path)
+                if match:
+                    raw_device = match.group(1)
+
+        power_status = "Desconocido"
+        temperature = "N/A"
+        health = "Desconocido"
+
+        if raw_device:
+            hdparm_res = subprocess.run(['sudo', 'hdparm', '-C', raw_device], capture_output=True, text=True)
+            if hdparm_res.returncode == 0:
+                stdout_lower = hdparm_res.stdout.lower()
+                if "standby" in stdout_lower:
+                    power_status = "Reposo (Standby)"
+                elif "active" in stdout_lower or "idle" in stdout_lower:
+                    power_status = "Activo (Girando)"
+
+            smart_res = subprocess.run(['sudo', 'smartctl', '-a', raw_device], capture_output=True, text=True)
+            if "SMART support is: Enabled" in smart_res.stdout or "SMART overall-health" in smart_res.stdout:
+                if "PASSED" in smart_res.stdout or "OK" in smart_res.stdout:
+                    health = "Correcto"
+                elif "FAILED" in smart_res.stdout:
+                    health = "Riesgo de fallo"
+                
+                for line in smart_res.stdout.split('\n'):
+                    if "Temperature_Celsius" in line:
+                        parts = line.split()
+                        temperature = f"{parts[-1]} °C"
+                        break
+                    elif "Current Drive Temperature:" in line:
+                        temperature = f"{line.split(':')[1].strip()} C"
+                        break
+
+        return jsonify({
+            "success": True,
+            "total": total,
+            "used": used,
+            "free": free,
+            "percent": percent,
+            "device": device_path,
+            "fs_type": fs_type.upper(),
+            "power_status": power_status,
+            "health": health,
+            "temperature": temperature
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error getting disk info: {e}")
+        return jsonify({"success": False, "message": "Error al leer la información del hardware."}), 500

@@ -1,6 +1,7 @@
 sudo apt install transmission-daemon
 sudo apt install minidlna
 sudo apt install hdparm
+sudo apt update && sudo apt install smartmontools -y
 
 #If the hard drive is ntfs
 sudo apt install ntfs-3g
