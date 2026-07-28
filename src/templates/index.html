@@ -351,13 +351,13 @@
 
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; text-align: left; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6;">
                             
-                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;">
                                 <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase; font-weight: bold;"><i class="fas fa-microchip"></i> Dispositivo</div>
                                 <div style="color: #212529; font-weight: 500; margin-top: 8px; font-size: 1.1em;">
                                     <span id="hw-device">-</span> <span id="hw-fs" style="font-size: 0.8em; background: #e9ecef; padding: 3px 6px; border-radius: 4px; margin-left: 5px; color: #495057;">-</span>
                                 </div>
-                                <div style="font-size: 0.8em; color: #888; margin-top: 6px; line-height: 1.3;">
-                                    Ruta física y formato del sistema de archivos (FUSEBLK equivale a NTFS).
+                                <div style="margin-top: 6px;">
+                                    <span id="hw-rw-status" style="font-size: 0.75em; padding: 3px 8px; border-radius: 12px; font-weight: bold;">-</span>
                                 </div>
                             </div>
 
@@ -383,6 +383,13 @@
                             </div>
 
                         </div>
+
+                        <div style="margin-top: 20px; text-align: right; border-top: 1px solid #e9ecef; padding-top: 15px;">
+                            <button class="btn btn-outline-danger" onclick="safeEjectDisk()" id="btn-eject-disk">
+                                <i class="fas fa-eject"></i> Extraer disco con seguridad
+                            </button>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -1016,6 +1023,17 @@
                         document.getElementById('hw-device').textContent = data.device;
                         document.getElementById('hw-fs').textContent = data.fs_type;
                         document.getElementById('hw-power').textContent = data.power_status;
+
+                        const rwBadge = document.getElementById('hw-rw-status');
+                        if (data.is_writable) {
+                            rwBadge.textContent = 'Lectura / Escritura';
+                            rwBadge.style.backgroundColor = '#d4edda';
+                            rwBadge.style.color = '#155724';
+                        } else {
+                            rwBadge.innerHTML = '<i class="fas fa-lock"></i> Solo Lectura (Bloqueado)';
+                            rwBadge.style.backgroundColor = '#f8d7da';
+                            rwBadge.style.color = '#721c24';
+                        }
                         
                         const healthSpan = document.getElementById('hw-health');
                         healthSpan.textContent = data.health;
@@ -1058,6 +1076,34 @@
                 diskTabBtn.addEventListener('click', loadDiskInfo);
             }
         });
+
+        function safeEjectDisk() {
+            if(confirm("¿Estás seguro de que quieres expulsar el disco? La web dejará de ver los archivos hasta que lo vuelvas a conectar físicamente.")) {
+                const btn = document.getElementById('btn-eject-disk');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Desmontando...';
+                btn.disabled = true;
+
+                fetch('/api/unmount-disk', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.success) {
+                        alert(data.message);
+                        btn.innerHTML = '<i class="fas fa-check"></i> Expulsado';
+                        btn.classList.replace('btn-outline-danger', 'btn-success');
+                    } else {
+                        alert(data.message);
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    alert("Error de red al intentar expulsar el disco.");
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+            }
+        }
     </script>
 
 </body>

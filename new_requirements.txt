@@ -78,8 +78,7 @@ sudo systemctl start minidlna
 sudo visudo
 
 add this line to the end (replace user):
-[user_name] ALL=(ALL) NOPASSWD: /bin/systemctl start minidlna, /bin/systemctl stop minidlna, /bin/systemctl restart minidlna, /bin/systemctl is-active minidlna
-
+[user_name] ALL=(ALL) NOPASSWD: /bin/systemctl start minidlna, /bin/systemctl stop minidlna, /bin/systemctl restart minidlna, /bin/systemctl is-active minidlna, /usr/sbin/smartctl, /sbin/hdparm, /bin/umount
 
 sudo apt update && sudo apt install samba -y
 

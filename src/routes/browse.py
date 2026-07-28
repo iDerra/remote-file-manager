@@ -200,6 +200,7 @@ def api_disk_info():
         power_status = "Desconocido"
         temperature = "N/A"
         health = "Desconocido"
+        is_writable = os.access(FILE_SYSTEM_ROOT, os.W_OK)
 
         if raw_device:
             hdparm_res = subprocess.run(['sudo', 'hdparm', '-C', raw_device], capture_output=True, text=True)
@@ -236,8 +237,24 @@ def api_disk_info():
             "fs_type": fs_type.upper(),
             "power_status": power_status,
             "health": health,
-            "temperature": temperature
+            "temperature": temperature,
+            "is_writable": is_writable
         })
     except Exception as e:
         current_app.logger.error(f"Error getting disk info: {e}")
         return jsonify({"success": False, "message": "Error al leer la información del hardware."}), 500
+
+@browse_bp.route('/api/unmount-disk', methods=['POST'])
+def api_unmount_disk():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    try:
+        subprocess.run(['sync'])
+        
+        res = subprocess.run(['sudo', 'umount', FILE_SYSTEM_ROOT], capture_output=True, text=True)
+        
+        if res.returncode == 0:
+            return jsonify({"success": True, "message": "Disco desconectado con seguridad. Ya puedes retirar el cable USB."})
+        else:
+            return jsonify({"success": False, "message": f"El disco está en uso y no se puede expulsar. Detén cualquier descarga o transferencia primero."})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
