@@ -33,6 +33,8 @@ def create_folder(parent_folder_segment):
     :rtype: werkzeug.wrappers.response.Response
     """
 
+    parent_folder_segment = unquote(parent_folder_segment)
+
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     actual_fs_relative_path = '' if parent_folder_segment == '__root__' else parent_folder_segment
     redirect_subpath_on_return = '' if parent_folder_segment == '__root__' else parent_folder_segment
@@ -88,6 +90,8 @@ def delete_item(item_to_delete_segment):
     :returns: A Flask redirect response to the browse view of the parent directory.
     :rtype: werkzeug.wrappers.response.Response
     """
+
+    item_to_delete_segment = unquote(item_to_delete_segment)
 
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     parent_directory_segment = os.path.dirname(item_to_delete_segment)
@@ -276,6 +280,8 @@ def move_item(item_to_move_segment):
     :returns: A Flask redirect response to the browse view of the original parent directory.
     :rtype: werkzeug.wrappers.response.Response
     """
+
+    item_to_move_segment = unquote(item_to_move_segment)
 
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     current_item_parent_dir = os.path.dirname(item_to_move_segment)
