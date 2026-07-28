@@ -408,23 +408,26 @@
             const wrapper = fileInput ? fileInput.closest('.custom-file-input-wrapper') : null;
             if (!wrapper) return;
             const fileChosenTextSpan = wrapper.querySelector('.custom-file-label .file-chosen-text');
-
             if (fileInput && fileChosenTextSpan) {
                 fileInput.addEventListener('change', function() {
                     if (this.files.length > 0) {
                         if (isFolderInput) {
-                            let firstFile = this.files;
-                            let directoryName = firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/') : "Folder";
-                            fileChosenTextSpan.textContent = `Folder: ${directoryName} (${this.files.length} files)`;
+                            // CORRECCIÓN: Accedemos a this.files[0] en lugar de this.files
+                            let firstFile = this.files[0]; 
+                            // Extraemos el nombre de la carpeta raíz
+                            let directoryName = firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/')[0] : "Carpeta";
+                            fileChosenTextSpan.textContent = `Carpeta: ${directoryName} (${this.files.length} archivos)`;
                         } else {
-                            fileChosenTextSpan.textContent = this.files.length > 1 ? `${this.files.length} files selected` : this.files.name;
+                            // CORRECCIÓN: Accedemos a this.files[0].name en lugar de this.files.name
+                            fileChosenTextSpan.textContent = this.files.length > 1 ? `${this.files.length} archivos seleccionados` : this.files[0].name;
                         }
                     } else {
-                        fileChosenTextSpan.textContent = isFolderInput ? 'Choose folder...' : 'Choose files...';
+                        fileChosenTextSpan.textContent = isFolderInput ? 'Elige una carpeta...' : 'Elige archivos...';
                     }
                 });
             }
         }
+        
         setupFileInputFeedback('files-upload-input-files', false);
         setupFileInputFeedback('files-upload-input-folder', true);
         setupFileInputFeedback('torrent_file', false);
