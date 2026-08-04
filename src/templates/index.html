@@ -10,8 +10,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles-modal.css') }}">
 </head>
 <body>
-    <div class="page-header">
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
         <h1>Exploring: /{{ current_path_display }}</h1>
+        <a href="{{ url_for('auth.logout') }}" class="btn" style="background-color: transparent; border: 1px solid #dc3545; color: #dc3545;">
+            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+        </a>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -384,12 +387,14 @@
 
                         </div>
 
-                        <div style="margin-top: 20px; text-align: right; border-top: 1px solid #e9ecef; padding-top: 15px;">
+                        <div style="margin-top: 20px; text-align: right; border-top: 1px solid #e9ecef; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+                            <button class="btn btn-outline-warning" onclick="cleanOrphanParts()" id="btn-clean-parts">
+                                <i class="fas fa-broom"></i> Limpiar archivos temporales (.part)
+                            </button>
                             <button class="btn btn-outline-danger" onclick="safeEjectDisk()" id="btn-eject-disk">
                                 <i class="fas fa-eject"></i> Extraer disco con seguridad
                             </button>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -1103,6 +1108,35 @@
                 });
             }
         }
+
+        function cleanOrphanParts() {
+            if(confirm("¿Seguro que quieres buscar y eliminar descargas web interrumpidas (.part)? Esto despertará el disco para analizarlo.")) {
+                const btn = document.getElementById('btn-clean-parts');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Limpiando...';
+                btn.disabled = true;
+
+                fetch('/api/cleanup_orphan_parts', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    if(data.success) {
+                        // Recargamos la información visual del disco para mostrar el espacio recuperado
+                        diskDataLoaded = false;
+                        const diskTabBtn = document.querySelector('[data-tab="tab-disk"]');
+                        if (diskTabBtn) diskTabBtn.click();
+                    }
+                })
+                .catch(err => {
+                    alert("Error de red al intentar limpiar archivos.");
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+            }
+        }
+
     </script>
 
 </body>

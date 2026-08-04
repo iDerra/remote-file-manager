@@ -148,33 +148,36 @@ def upload_files(destination_folder_segment):
         return jsonify({"success": False, "message": "Calculated path invalid."}), 403
 
     target_item_directory_abs = os.path.join(FILE_SYSTEM_ROOT, final_item_relative_dir)
-
     try:
         os.makedirs(target_item_directory_abs, exist_ok=True)
     except OSError as e:
         return jsonify({"success": False, "message": f"Error creating dir: {e}"}), 500
-
-    destination_file_path_abs = os.path.join(target_item_directory_abs, filename_secured)
+        
+    final_file_path_abs = os.path.join(target_item_directory_abs, filename_secured)
+    destination_file_path_abs = final_file_path_abs
     
-    # Comprobación de existencia (Solo si es un archivo normal o el primer chunk)
-    if os.path.exists(destination_file_path_abs) and (not is_chunked or chunk_index == 0):
-        return jsonify({"success": False, "message": "File already exists. Skipped."}), 409 
+    if is_chunked:
+        destination_file_path_abs += '.part'
+
+    # Comprobación de existencia del archivo FINAL
+    if os.path.exists(final_file_path_abs) and (not is_chunked or chunk_index == 0):
+        return jsonify({"success": False, "message": "File already exists. Skipped."}), 409
 
     try:
         if is_chunked:
             # Modo Chunk: Abrimos en modo "append binary" ('ab') para añadir al final
             with open(destination_file_path_abs, 'ab') as f:
                 f.write(file_storage.read())
-            
-            # Si era el último chunk, mandamos éxito total
+                
+            # Si era el último chunk, renombramos quitando el .part y mandamos éxito total
             if chunk_index == total_chunks - 1:
+                os.rename(destination_file_path_abs, final_file_path_abs)
                 return jsonify({"success": True, "message": "File uploaded successfully."}), 200
             else:
-                # Si faltan chunks, avisamos de que este trozo se subió bien
                 return jsonify({"success": True, "message": "Chunk uploaded."}), 206
         else:
             # Modo Normal (archivos pequeños sin chunks)
-            file_storage.save(destination_file_path_abs)
+            file_storage.save(final_file_path_abs)
             return jsonify({"success": True, "message": "File uploaded successfully."}), 200
             
     except Exception as e:
@@ -320,3 +323,32 @@ def stream_subtitle(filepath, stream_index):
         abort(404)
         
     return Response(generate_vtt_stream(abs_path, stream_index), mimetype='text/vtt')
+
+
+@files_bp.route('/api/cleanup_orphan_parts', methods=['POST'])
+def cleanup_orphan_parts():
+    FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
+    cleaned_files_count = 0
+    freed_space_bytes = 0
+
+    try:
+        for root, dirs, files in os.walk(FILE_SYSTEM_ROOT):
+            for file in files:
+                if file.endswith('.part'):
+                    full_path = os.path.join(root, file)
+                    try:
+                        size = os.path.getsize(full_path)
+                        os.remove(full_path)
+                        freed_space_bytes += size
+                        cleaned_files_count += 1
+                    except OSError as e:
+                        current_app.logger.error(f"Failed to delete {full_path}: {e}")
+
+        freed_mb = freed_space_bytes / (1024 * 1024)
+        return jsonify({
+            "success": True, 
+            "message": f"Limpieza completada. {cleaned_files_count} archivo(s) eliminado(s), liberando {freed_mb:.2f} MB."
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"Error during orphan cleanup: {e}")
+        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"}), 500

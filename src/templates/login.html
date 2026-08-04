@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager - Login</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
+        .login-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+        .login-container h2 { margin-top: 0; color: #343a40; margin-bottom: 25px; font-weight: 600; }
+        .login-container .icon { font-size: 3em; color: #007bff; margin-bottom: 15px; }
+        .styled-form input[type="password"] { width: 100%; padding: 13px 12px; border: 1px solid #ced4da; border-radius: 5px; box-sizing: border-box; font-size: 1em; transition: border-color 0.15s ease-in-out; }
+        .styled-form input[type="password"]:focus { border-color: #80bdff; outline: 0; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <i class="fas fa-server icon"></i>
+        <h2>Acceso Remoto</h2>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="flash-messages" style="margin: 0 0 20px 0; text-align: left; padding: 0;">
+            {% for category, message in messages %}
+            <li class="alert-{{ category }}" style="list-style: none;">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('auth.login') }}" method="post" class="styled-form" style="text-align: left;">
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px; padding: 12px; font-size: 1.1em;">Entrar</button>
+        </form>
+    </div>
+</body>
+</html>
