@@ -4,31 +4,25 @@ import os
 import shutil
 import tempfile
 import uuid
-import subprocess
-import json
-
 from werkzeug.utils import secure_filename
 from utils.utilsHandler import is_safe_path
-from urllib.parse import unquote # Importante: Traductor de rutas URL
-
+from utils.file_ops import get_video_subtitles, generate_vtt_stream
+from urllib.parse import unquote
 
 files_bp = Blueprint('files', __name__)
 
 TEMP_ZIP_FOLDER_NAME = '.tmp_zips'
 
 def get_temp_zip_dir_abs():
-    temp_zip_dir = os.path.join(current_app.static_folder, TEMP_ZIP_FOLDER_NAME)
+    file_system_root = current_app.config['FILE_SYSTEM_ROOT']
+    temp_zip_dir = os.path.join(file_system_root, TEMP_ZIP_FOLDER_NAME)
     os.makedirs(temp_zip_dir, exist_ok=True)
     return temp_zip_dir
-
 
 @files_bp.route('/download_file/<path:filepath>')
 def download_single_file(filepath):
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
-    
-    # --- FIX: Descodificamos los espacios y caracteres especiales ---
     filepath = unquote(filepath)
-    # ----------------------------------------------------------------
     
     if not is_safe_path(FILE_SYSTEM_ROOT, filepath):
         current_app.logger.warning(f"Unsecured download attempt (file): {filepath} path {FILE_SYSTEM_ROOT}")
@@ -55,71 +49,60 @@ def download_single_file(filepath):
 @files_bp.route('/download_folder_zip/<path:folderpath>')
 def download_folder_zip(folderpath):
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
-
-    # --- FIX: Descodificamos los espacios ---
     folderpath = unquote(folderpath)
-    # ----------------------------------------
-
+    
     if not is_safe_path(FILE_SYSTEM_ROOT, folderpath):
         current_app.logger.warning(f"Unsecured download attempt (folder): {folderpath} path {FILE_SYSTEM_ROOT}")
         abort(404, "Folder not found or not allowed.")
-        
+            
     absolute_folder_path = os.path.join(FILE_SYSTEM_ROOT, folderpath)
-
     if not os.path.isdir(absolute_folder_path):
         current_app.logger.warning(f"ZIP download requested for a non-directory: {absolute_folder_path}")
         abort(404, "The requested resource is not a valid directory or does not exist.")
-        
-    temp_dir_for_zip_creation = None
-    try:
-        temp_dir_for_zip_creation = tempfile.mkdtemp()
-        
-        folder_name_for_zip_source = os.path.basename(folderpath) if folderpath else os.path.basename(FILE_SYSTEM_ROOT)
-        zip_display_name_base = secure_filename(folder_name_for_zip_source)
-        if not zip_display_name_base:
-             zip_display_name_base = "archive"
-        
-        archive_basename_in_temp_dir = os.path.join(temp_dir_for_zip_creation, zip_display_name_base)
-        
-        if folderpath:
-            root_dir_for_archive = os.path.dirname(absolute_folder_path)
-            base_dir_for_archive = os.path.basename(absolute_folder_path)
-        else:
-            root_dir_for_archive = os.path.dirname(FILE_SYSTEM_ROOT) 
-            base_dir_for_archive = os.path.basename(FILE_SYSTEM_ROOT)
-            if not base_dir_for_archive:
-                 base_dir_for_archive = "filesystem_root"
-
-        zip_filename_full_path = shutil.make_archive(
-            base_name=archive_basename_in_temp_dir,
-            format='zip',
-            root_dir=root_dir_for_archive,
-            base_dir=base_dir_for_archive
-        )
-
-        final_zip_display_name = f"{zip_display_name_base}.zip"
-        response = send_file(zip_filename_full_path, download_name=final_zip_display_name, as_attachment=True)
-
-        @after_this_request 
-        def cleanup_single_folder_zip(response_from_send_file):
-            try:
-                if temp_dir_for_zip_creation and os.path.exists(temp_dir_for_zip_creation):
-                    shutil.rmtree(temp_dir_for_zip_creation)
-                    current_app.logger.info(f"Temporary dir for single folder zip cleaned: {temp_dir_for_zip_creation}")
-            except Exception as error:
-                current_app.logger.error(f"Error deleting temporary dir for single folder zip {temp_dir_for_zip_creation}: {error}")
-            return response_from_send_file
             
-        return response
-        
-    except Exception as e:
-        current_app.logger.error(f"Error creating zip for folder {folderpath}: {e}")
-        if temp_dir_for_zip_creation and os.path.exists(temp_dir_for_zip_creation):
+    # Determinar el nombre del archivo ZIP
+    folder_name_for_zip_source = os.path.basename(folderpath) if folderpath else os.path.basename(FILE_SYSTEM_ROOT)
+    zip_display_name_base = secure_filename(folder_name_for_zip_source)
+    if not zip_display_name_base: 
+        zip_display_name_base = "archive"
+    final_zip_display_name = f"{zip_display_name_base}.zip"
+    
+    # Generar ruta de almacenamiento temporal segura (usando la HDD de 4TB)
+    temp_zip_storage_abs = get_temp_zip_dir_abs()
+    unique_zip_filename = f"{uuid.uuid4()}_{final_zip_display_name}"
+    zip_filename_full_path = os.path.join(temp_zip_storage_abs, unique_zip_filename)
+    
+    # Importar nuestra función optimizada
+    from utils.file_ops import create_zip_from_items
+    
+    # Preparamos la ruta como una lista de un solo elemento para reutilizar la función
+    items_unquoted = [folderpath] if folderpath else ['']
+    
+    # Crear el ZIP directamente, sin copias intermedias y sin compresión excesiva
+    success, message = create_zip_from_items(FILE_SYSTEM_ROOT, items_unquoted, zip_filename_full_path)
+    
+    if not success:
+        current_app.logger.error(f"Error creating zip for folder {folderpath}: {message}")
+        # Limpieza en caso de error
+        if os.path.exists(zip_filename_full_path):
             try:
-                shutil.rmtree(temp_dir_for_zip_creation)
+                os.remove(zip_filename_full_path)
             except Exception as cleanup_error:
-                current_app.logger.error(f"Error deleting temporary dir {temp_dir_for_zip_creation} after failure: {cleanup_error}")
+                current_app.logger.error(f"Error deleting temporary file {zip_filename_full_path} after failure: {cleanup_error}")
         abort(500, "Error creating the folder ZIP file.")
+
+    # Programar la limpieza del archivo ZIP después de que el usuario lo descargue
+    @after_this_request 
+    def cleanup_single_folder_zip(response_from_send_file):
+        try:
+            if os.path.exists(zip_filename_full_path):
+                os.remove(zip_filename_full_path)
+                current_app.logger.info(f"Temporary zip cleaned: {zip_filename_full_path}")
+        except Exception as error:
+            current_app.logger.error(f"Error deleting temporary zip {zip_filename_full_path}: {error}")
+        return response_from_send_file
+            
+    return send_file(zip_filename_full_path, download_name=final_zip_display_name, as_attachment=True)
 
 
 @files_bp.route('/upload/<path:destination_folder_segment>', methods=['POST'])
@@ -201,99 +184,56 @@ def upload_files(destination_folder_segment):
 
 @files_bp.route('/api/prepare_multiple_files_zip', methods=['POST'])
 def prepare_multiple_files_zip():
-    # ... Esta función ya la procesamos bien en el bucle interior con el unquote
     FILE_SYSTEM_ROOT = current_app.config['FILE_SYSTEM_ROOT']
     data = request.get_json()
-
+    
     if not data:
         return jsonify({"success": False, "message": "Invalid request."}), 400
-
+        
     item_paths_quoted = data.get('items_to_download')
     user_zip_name_suggestion = data.get('zip_name', 'archive.zip')
-
-    if not item_paths_quoted or not isinstance(item_paths_quoted, list):
-        return jsonify({"success": False, "message": "No items specified for download or invalid format."}), 400
     
+    if not item_paths_quoted or not isinstance(item_paths_quoted, list):
+        return jsonify({"success": False, "message": "No items specified for download."}), 400
+        
     if not user_zip_name_suggestion.endswith('.zip'):
         user_zip_name_suggestion += '.zip'
-    
-    zip_display_name = secure_filename(user_zip_name_suggestion)
-    if not zip_display_name:
-        zip_display_name = "downloaded_files.zip"
-
-    staging_dir_for_zip_contents = None
-    zip_creation_temp_dir = None
+        
+    zip_display_name = secure_filename(user_zip_name_suggestion) or "downloaded_files.zip"
     
     temp_zip_storage_abs = get_temp_zip_dir_abs()
     unique_zip_filename_on_server = f"{uuid.uuid4()}_{zip_display_name}"
     final_zip_path_on_server_abs = os.path.join(temp_zip_storage_abs, unique_zip_filename_on_server)
-
-    try:
-        staging_dir_for_zip_contents = tempfile.mkdtemp() 
-        zip_creation_temp_dir = tempfile.mkdtemp()
-        
-        items_processed_count = 0
-        for item_path_q in item_paths_quoted:
-            item_path_unquoted = unquote(item_path_q)
-
-            if not is_safe_path(FILE_SYSTEM_ROOT, item_path_unquoted):
-                current_app.logger.warning(f"Multi-download prep: Unsafe path skipped: {item_path_unquoted}")
-                continue
+    
+    # Decodificar y validar rutas
+    items_unquoted = []
+    for item_q in item_paths_quoted:
+        item_unq = unquote(item_q)
+        if is_safe_path(FILE_SYSTEM_ROOT, item_unq):
+            items_unquoted.append(item_unq)
             
-            absolute_item_path = os.path.join(FILE_SYSTEM_ROOT, item_path_unquoted)
+    if not items_unquoted:
+        return jsonify({"success": False, "message": "No valid files or folders were found."}), 400
 
-            if not os.path.exists(absolute_item_path):
-                current_app.logger.warning(f"Multi-download prep: Item '{item_path_unquoted}' not found, skipped.")
-                continue
-
-            destination_path_in_staging = os.path.join(staging_dir_for_zip_contents, item_path_unquoted)
-            destination_parent_dir_in_staging = os.path.dirname(destination_path_in_staging)
-            if destination_parent_dir_in_staging and not os.path.exists(destination_parent_dir_in_staging):
-                os.makedirs(destination_parent_dir_in_staging, exist_ok=True)
-
-            if os.path.isfile(absolute_item_path):
-                shutil.copy2(absolute_item_path, destination_path_in_staging)
-                items_processed_count += 1
-            elif os.path.isdir(absolute_item_path):
-                shutil.copytree(absolute_item_path, destination_path_in_staging, dirs_exist_ok=True)
-                items_processed_count += 1
-            else:
-                current_app.logger.warning(f"Multi-download prep: Item '{item_path_unquoted}' is not a file or folder, skipped.")
-
-        if items_processed_count == 0:
-            flash("No valid files or folders were found to include in the ZIP.", "warning")
-            return jsonify({"success": False, "message": "No valid files or folders were found to include in the ZIP."}), 400
-
-        archive_base_name_in_temp = os.path.join(zip_creation_temp_dir, os.path.splitext(zip_display_name))
-        
-        created_archive_path_abs = shutil.make_archive(
-            base_name=archive_base_name_in_temp,
-            format='zip',
-            root_dir=staging_dir_for_zip_contents
-        )
-        
-        shutil.move(created_archive_path_abs, final_zip_path_on_server_abs)
-
-        download_url_for_client = url_for('files.download_prepared_zip_route', 
-                                          zip_file_on_server=unique_zip_filename_on_server, 
-                                          _external=False)
-
-        flash(f"ZIP file '{zip_display_name}' is ready. Your download will start automatically.", "success")
-        return jsonify({
-            "success": True,
-            "download_url": download_url_for_client,
-            "zip_display_name": zip_display_name
-        }), 200
-
-    except Exception as e:
-        current_app.logger.error(f"Error creating multi-item ZIP for '{zip_display_name}': {e}")
-        flash("Server error while creating the ZIP file. Please try again.", "danger")
+    # Llamada limpia y segura a nuestra nueva función
+    from utils.file_ops import create_zip_from_items
+    success, message = create_zip_from_items(FILE_SYSTEM_ROOT, items_unquoted, final_zip_path_on_server_abs)
+    
+    if not success:
+        current_app.logger.error(message)
         return jsonify({"success": False, "message": "Server error while creating the ZIP file."}), 500
-    finally:
-        if staging_dir_for_zip_contents and os.path.exists(staging_dir_for_zip_contents):
-            shutil.rmtree(staging_dir_for_zip_contents)
-        if zip_creation_temp_dir and os.path.exists(zip_creation_temp_dir):
-            shutil.rmtree(zip_creation_temp_dir)
+        
+    download_url_for_client = url_for('files.download_prepared_zip_route',
+                                       zip_file_on_server=unique_zip_filename_on_server,
+                                       _external=False)
+                                       
+    flash(f"ZIP file '{zip_display_name}' is ready. Your download will start automatically.", "success")
+    
+    return jsonify({
+        "success": True,
+        "download_url": download_url_for_client,
+        "zip_display_name": zip_display_name
+    }), 200
             
 
 @files_bp.route('/download_prepared_zip/<path:zip_file_on_server>')
@@ -364,25 +304,7 @@ def video_subtitles_info(filepath):
         return jsonify({"success": False, "subtitles": []})
         
     try:
-        cmd = [
-            'ffprobe', '-v', 'error', 
-            '-select_streams', 's', 
-            '-show_entries', 'stream=index:stream_tags=language,title', 
-            '-of', 'json', abs_path
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        data = json.loads(result.stdout)
-        
-        subs = []
-        for stream in data.get('streams', []):
-            tags = stream.get('tags', {})
-            lang = tags.get('language', 'und')
-            title = tags.get('title', f'Pista {stream.get("index")}')
-            subs.append({
-                'index': stream.get('index'),
-                'language': lang,
-                'label': f"{title} ({lang})"
-            })
+        subs = get_video_subtitles(abs_path)
         return jsonify({"success": True, "subtitles": subs})
     except Exception as e:
         current_app.logger.error(f"Error reading subtitles with ffprobe: {e}")
@@ -397,14 +319,4 @@ def stream_subtitle(filepath, stream_index):
     if not os.path.isfile(abs_path):
         abort(404)
         
-    def generate():
-        cmd = [
-            'ffmpeg', '-v', 'error', '-i', abs_path,
-            '-map', f'0:{stream_index}',
-            '-f', 'webvtt', '-'
-        ]
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        for chunk in iter(lambda: process.stdout.read(4096), b''):
-            yield chunk
-            
-    return Response(generate(), mimetype='text/vtt')
+    return Response(generate_vtt_stream(abs_path, stream_index), mimetype='text/vtt')

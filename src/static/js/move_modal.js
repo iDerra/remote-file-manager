@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function () {
-
     const moveItemModal = document.getElementById('move-item-modal');
     const modalCloseBtn = moveItemModal ? moveItemModal.querySelector('.modal-close-btn') : null;
     const modalItemNameDisplay = moveItemModal ? document.getElementById('modal-item-name-display') : null;
@@ -11,194 +10,119 @@ document.addEventListener('DOMContentLoaded', function () {
     let itemsToProcessInModal = [];
     let selectedDestinationPathInModal = null;
 
-    /**
-     * Updates the enabled/disabled state of the modal's confirm button.
-     * The button is enabled only if a destination folder has been selected.
-     */
     function updateModalConfirmButtonState() {
         if (!modalMoveConfirmBtn) return;
         modalMoveConfirmBtn.disabled = selectedDestinationPathInModal === null;
     }
 
-    /**
-     * Opens the move modal for a single item.
-     * @param {string} itemPath - The path of the item to be moved.
-     * @param {string} itemName - The display name of the item.
-     */
+    // Extrae la ruta de la carpeta padre para que el modal se abra allí
+    function getParentPath(path) {
+        const lastSlashIndex = path.lastIndexOf('/');
+        if (lastSlashIndex === -1) return ''; // Raíz
+        return path.substring(0, lastSlashIndex);
+    }
+
     function openSingleItemMoveModal(itemPath, itemName) {
         if (!moveItemModal || !modalItemNameDisplay) return;
         itemsToProcessInModal = [itemPath];
         modalItemNameDisplay.textContent = `Item: ${itemName}`;
-        openModalSharedLogic();
+        
+        let initialPath = getParentPath(itemPath);
+        openModalSharedLogic(initialPath);
     }
 
-    /**
-     * Opens the move modal for multiple items. This function is exposed globally
-     * so it can be called from other scripts (e.g., bulk actions script).
-     * @param {string[]} itemPathsList - An array of paths for the items to be moved.
-     * @global
-     */
     window.openMoveModalForItems = function(itemPathsList) {
         if (!moveItemModal || !modalItemNameDisplay) return;
-        if (!itemPathsList || itemPathsList.length === 0) {
-            console.warn("No items provided to openMoveModalForItems");
-            return;
-        }
+        if (!itemPathsList || itemPathsList.length === 0) return;
         itemsToProcessInModal = itemPathsList;
         modalItemNameDisplay.textContent = `${itemPathsList.length} item(s) selected`;
-        openModalSharedLogic();
+        
+        let initialPath = getParentPath(itemPathsList[0]);
+        openModalSharedLogic(initialPath);
     }
 
-    /**
-     * Contains shared logic for opening the move modal, whether for single or multiple items.
-     * Resets modal state, displays loading text for the folder list, shows the modal,
-     * and initiates fetching of the folder list.
-     */
-    function openModalSharedLogic() {
+    function openModalSharedLogic(initialPath) {
         selectedDestinationPathInModal = null;
-        if (modalFolderListContainer) modalFolderListContainer.innerHTML = '<p class="loading-text">Loading folders...</p>';
+        if (modalFolderListContainer) modalFolderListContainer.innerHTML = '<p class="loading-text">Cargando...</p>';
         if (moveItemModal) moveItemModal.style.display = 'block';
-        populateModalFolderList();
-        updateModalConfirmButtonState();
+        
+        loadFoldersLazy(initialPath);
     }
 
-    /**
-     * Closes the move item modal and resets its state.
-     */
     function closeMoveItemModal() {
         if (!moveItemModal) return;
         moveItemModal.style.display = 'none';
-        itemsToProcessInModal = []; 
-        selectedDestinationPathInModal = null; 
+        itemsToProcessInModal = [];
+        selectedDestinationPathInModal = null;
     }
 
-    /**
-     * Handles the selection of a folder within the modal's folder tree.
-     * Updates the `selectedDestinationPathInModal` and visually highlights the selected folder.
-     * @param {HTMLLIElement} selectedLiElement - The list item element that was clicked.
-     * @param {string} folderPath - The path of the selected folder.
-     */
-    function handleFolderSelectionInModal(selectedLiElement, folderPath) {
+    function loadFoldersLazy(path) {
         if (!modalFolderListContainer) return;
-        selectedDestinationPathInModal = folderPath;
+        modalFolderListContainer.innerHTML = '<p class="loading-text"><i class="fas fa-spinner fa-spin"></i> Explorando...</p>';
+        
+        fetch('/api/folders-lazy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: path })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                modalFolderListContainer.innerHTML = `<p class="loading-text" style="color: red;">Error: ${data.error}</p>`;
+                return;
+            }
+            
+            // La carpeta que se visualiza se selecciona automáticamente como destino
+            selectedDestinationPathInModal = data.current_path;
+            updateModalConfirmButtonState();
+            
+            modalFolderListContainer.innerHTML = '';
+            
+            const pathHeader = document.createElement('div');
+            pathHeader.style.padding = '10px';
+            pathHeader.style.fontWeight = 'bold';
+            pathHeader.style.backgroundColor = '#f8f9fa';
+            pathHeader.style.borderBottom = '1px solid #dee2e6';
+            pathHeader.style.marginBottom = '5px';
+            pathHeader.innerHTML = `<i class="fas fa-bullseye" style="color:#007bff; margin-right:5px;"></i> Destino: /${data.current_path}`;
+            modalFolderListContainer.appendChild(pathHeader);
 
-        modalFolderListContainer.querySelectorAll('li.folder-item').forEach(li => li.classList.remove('selected'));
-        if (selectedLiElement) {
-             selectedLiElement.classList.add('selected');
-        }
-        updateModalConfirmButtonState();
-    }
-    
-    /**
-     * Recursively creates list item elements for the folder tree display in the modal.
-     * Each folder can be expanded/collapsed if it has children.
-     * @param {object} folderData - Data for the folder, including name, path, and children.
-     * @param {string} folderData.name - The display name of the folder.
-     * @param {string} folderData.path - The relative path of the folder.
-     * @param {object[]} folderData.children - An array of child folder data objects.
-     * @param {boolean} [isRootPseudoFolder=false] - Flag to indicate if this is the virtual "Root" folder.
-     * @returns {HTMLLIElement} The created list item element representing the folder.
-     */
-    function createFolderListItem(folderData, isRootPseudoFolder = false) {
-        const li = document.createElement('li');
-        li.classList.add('folder-item');
-        li.dataset.path = folderData.path;
+            const ul = document.createElement('ul');
+            ul.classList.add('top-level-folder-list');
+            ul.style.listStyle = 'none';
+            ul.style.padding = '0';
+            ul.style.margin = '0';
 
-        const contentWrapper = document.createElement('div');
-        contentWrapper.classList.add('folder-content-wrapper');
+            // Opción para ir a la carpeta anterior
+            if (data.parent_path !== null) {
+                const li = document.createElement('li');
+                li.classList.add('folder-item');
+                li.innerHTML = '<div class="folder-content-wrapper" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #e9ecef;"><i class="fas fa-level-up-alt folder-icon-tree" style="margin-right:8px; color:#6c757d;"></i><span class="folder-name font-weight-bold" style="color:#6c757d;">.. (Carpeta anterior)</span></div>';
+                li.addEventListener('click', () => loadFoldersLazy(data.parent_path));
+                ul.appendChild(li);
+            }
 
-        const toggleIcon = document.createElement('i');
-        toggleIcon.classList.add('fas', 'folder-toggle-icon');
-        if ((isRootPseudoFolder && folderData.children && folderData.children.length > 0) || (!isRootPseudoFolder && folderData.children && folderData.children.length > 0)) {
-            toggleIcon.classList.add('fa-caret-right');
-        } else {
-            toggleIcon.classList.add('no-children');
-        }
+            // Opciones de subcarpetas
+            data.folders.forEach(folder => {
+                const li = document.createElement('li');
+                li.classList.add('folder-item');
+                li.innerHTML = `<div class="folder-content-wrapper" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #e9ecef;"><i class="fas fa-folder folder-icon-tree" style="margin-right:8px; color:#FFD700;"></i><span class="folder-name">${folder.name}</span></div>`;
+                li.addEventListener('click', () => loadFoldersLazy(folder.path));
+                ul.appendChild(li);
+            });
 
-        const folderIconElement = document.createElement('i');
-        folderIconElement.classList.add('fas', isRootPseudoFolder ? 'fa-hdd' : 'fa-folder', 'folder-icon-tree');
+            if (data.folders.length === 0 && data.parent_path === null) {
+               const li = document.createElement('li');
+               li.innerHTML = '<div style="padding: 10px; color: #888;">Directorio vacío</div>';
+               ul.appendChild(li);
+            }
 
-        const folderNameSpan = document.createElement('span');
-        folderNameSpan.classList.add('folder-name');
-        folderNameSpan.textContent = folderData.name;
-
-        contentWrapper.appendChild(toggleIcon);
-        contentWrapper.appendChild(folderIconElement);
-        contentWrapper.appendChild(folderNameSpan);
-        li.appendChild(contentWrapper);
-
-        contentWrapper.addEventListener('click', (event) => {
-            event.stopPropagation();
-            handleFolderSelectionInModal(li, folderData.path);
+            modalFolderListContainer.appendChild(ul);
+        })
+        .catch(error => {
+            modalFolderListContainer.innerHTML = `<p class="loading-text" style="color: red;">Error de red: ${error.message}</p>`;
         });
-
-        if (folderData.children && folderData.children.length > 0) {
-            const subList = document.createElement('ul');
-            subList.classList.add('subfolder-list');
-            subList.style.display = 'none';
-
-            folderData.children.forEach(childFolder => {
-                subList.appendChild(createFolderListItem(childFolder));
-            });
-            li.appendChild(subList);
-
-            toggleIcon.addEventListener('click', (event) => {
-                event.stopPropagation();
-                const isExpanded = subList.style.display === 'block';
-                subList.style.display = isExpanded ? 'none' : 'block';
-                toggleIcon.classList.toggle('fa-caret-right', isExpanded);
-                toggleIcon.classList.toggle('fa-caret-down', !isExpanded);
-                li.classList.toggle('expanded', !isExpanded);
-            });
-        }
-        return li;
     }
-
-    /**
-     * Fetches the folder tree structure from the server API and populates the modal's list.
-     * Displays loading and error messages as appropriate.
-     * A "Root" pseudo-folder is added to allow moving items to the base directory.
-     */
-    function populateModalFolderList() {
-        if (!modalFolderListContainer) return;
-        if (typeof listFoldersTreeApiUrl === 'undefined') { 
-            modalFolderListContainer.innerHTML = '<p class="loading-text">Error: Tree API URL not configured.</p>';
-            console.error("listFoldersTreeApiUrl is not defined. Check index.html script block.");
-            return;
-        }
-
-        fetch(listFoldersTreeApiUrl)
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error ${response.status} fetching folder tree.`);
-                return response.json();
-            })
-            .then(folderTreeData => {
-                if (folderTreeData.error) {
-                    console.error('Error from server fetching folder tree:', folderTreeData.error);
-                    modalFolderListContainer.innerHTML = `<p class="loading-text">Error loading folders: ${folderTreeData.error}</p>`;
-                    return;
-                }
-
-                modalFolderListContainer.innerHTML = '';
-                const ul = document.createElement('ul');
-                ul.classList.add('top-level-folder-list');
-
-                const rootPseudoFolder = {
-                    name: 'Root',
-                    path: '',
-                    children: folderTreeData,
-                    depth: 0 
-                };
-                ul.appendChild(createFolderListItem(rootPseudoFolder, true));
-
-                modalFolderListContainer.appendChild(ul);
-            })
-            .catch(error => {
-                console.error('Failed to fetch or populate folder tree for move:', error);
-                modalFolderListContainer.innerHTML = `<p class="loading-text">Failed to load folders. ${error.message}</p>`;
-            });
-    }
-
 
     if (moveItemModal) {
         openMoveModalButtons.forEach(button => {
@@ -217,58 +141,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (modalMoveConfirmBtn) {
             modalMoveConfirmBtn.addEventListener('click', function() {
-                /**
-                 * Handles the click event for the modal's "Confirm Move" button.
-                 * Validates that items and a destination are selected.
-                 * Sends a POST request to the server API to move the items.
-                 * Reloads the page on success, shows an alert on error.
-                 */
                 if (itemsToProcessInModal.length === 0 || selectedDestinationPathInModal === null) {
                     alert('No items to move or no destination folder selected.');
                     return;
                 }
-    
+                
                 if (typeof moveMultipleItemsApiUrl === 'undefined') {
-                    console.error("moveMultipleItemsApiUrl is not defined. Check index.html script block.");
-                    alert("Error: Move action URL not configured."); // User-facing error
+                    alert("Error: Move action URL not configured.");
                     return;
                 }
-                const moveUrl = moveMultipleItemsApiUrl;
-    
+                
                 const payload = {
                     items_to_move: itemsToProcessInModal,
                     destination_path: selectedDestinationPathInModal
                 };
-    
-                fetch(moveUrl, {
+                
+                fetch(moveMultipleItemsApiUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 })
                 .then(response => {
                     if (!response.ok) {
-                         
-                         return response.json().then(errData => {
-                            let serverMessage = `Server error: ${response.status} ${response.statusText}`;
-                            if (errData && errData.message) serverMessage = errData.message;
-                            throw new Error(serverMessage);
-                        }).catch((e) => { 
-                            if (e instanceof Error && e.message.startsWith("Server error:")) throw e;
-                            throw new Error(`Server error: ${response.status} ${response.statusText}. Could not parse error details.`);
+                        return response.json().then(errData => {
+                            throw new Error(errData.message || `Server error: ${response.status}`);
+                        }).catch(e => {
+                            throw new Error(e.message || `Server error: ${response.status}`);
                         });
                     }
-                    return response.json(); 
+                    return response.json();
                 })
                 .then(data => {
                     closeMoveItemModal();
-                    setTimeout(() => { 
-                        window.location.reload();
-                    }, 200); 
+                    setTimeout(() => window.location.reload(), 200);
                 })
                 .catch(error => {
-                    console.error('[move_modal.js] Final error moving items:', error);
                     alert(`Error moving items: ${error.message}`);
                 });
             });
