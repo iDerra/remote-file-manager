@@ -1,190 +1,172 @@
+/* ==========================================================================
+   9. MODALES (VENTANAS EMERGENTES)
+   ========================================================================== */
+/* Fondo oscuro semitransparente con efecto blur */
 .modal {
-    display: none; 
-    position: fixed; 
-    z-index: 1050;
+    display: none;
+    position: fixed;
+    z-index: 1000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     overflow: auto;
-    background-color: rgba(0, 0, 0, 0.6);
-    animation: fadeInBackground 0.3s ease-out;
+    background-color: rgba(17, 24, 39, 0.5); /* Usa un gris oscuro translúcido */
+    backdrop-filter: blur(4px); /* Desenfoque moderno del fondo */
+    animation: fadeIn 0.2s ease-out;
 }
 
+/* Contenedor principal del Modal */
 .modal-content {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color: #ffffff;
-    margin: 10vh auto;
-    padding: 0;
-    border: none; 
+    background-color: var(--bg-surface);
+    margin: 5% auto; /* 5% desde arriba y centrado */
     width: 90%;
-    max-width: 550px;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    max-width: 600px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     display: flex;
     flex-direction: column;
-    animation: slideDownModal 0.4s ease-out;
+    overflow: hidden;
+    animation: slideIn 0.3s ease-out;
 }
 
+@keyframes slideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Cabecera del Modal */
 .modal-header {
-    padding: 16px 24px;
-    background-color: #007bff; 
-    color: white;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px; 
-    border-bottom: 1px solid #0056b3;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background-color: #f9fafb;
 }
 
 .modal-header h4 {
     margin: 0;
-    font-size: 1.25em;
-    font-weight: 500;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
 .modal-close-btn {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 28px;
-    font-weight: normal;
+    color: var(--text-muted);
+    font-size: 24px;
+    font-weight: bold;
     cursor: pointer;
-    padding: 0 4px;
+    transition: color 0.2s ease;
     line-height: 1;
-    transition: color 0.15s ease-in-out;
 }
 
-.modal-close-btn:hover,
-.modal-close-btn:focus {
-    color: #ffffff;
-    text-decoration: none;
+.modal-close-btn:hover {
+    color: var(--danger-color);
 }
 
+/* Cuerpo del Modal */
 .modal-body {
-    padding: 20px 24px;
-    min-height: 150px;
+    padding: 24px;
     max-height: 60vh;
     overflow-y: auto;
-    color: #495057;
 }
 
-.modal-body p:first-child {
-    margin-top: 0;
-    margin-bottom: 12px;
-    font-size: 1em;
-}
-
+/* Pie del Modal */
 .modal-footer {
     padding: 16px 24px;
-    background-color: #f8f9fa;
-    border-top: 1px solid #dee2e6;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-    text-align: right;
+    border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
-    gap: 10px; 
+    gap: 12px;
+    background-color: #f9fafb;
 }
 
-
+/* ==========================================================================
+   10. ÁRBOL DE CARPETAS (Para Selector de Destino)
+   ========================================================================== */
 .folder-list-container {
-    border: 1px solid #ced4da;
-    border-radius: 5px;
-    padding: 0;
-    margin-top: 10px;
-    max-height: 250px;
+    margin-top: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--bg-surface);
+    padding: 12px;
+    max-height: 350px;
     overflow-y: auto;
-    background-color: #fff;
 }
 
-.folder-list-container ul {
+.top-level-folder-list,
+.subfolder-list {
     list-style-type: none;
-    padding: 0;
-    margin: 0;
+    padding-left: 0;
 }
 
-.folder-list-container ul.subfolder-list {
-    padding-left: 20px;
+.subfolder-list {
+    padding-left: 24px;
+    border-left: 1px dashed var(--border-color);
+    margin-left: 12px;
 }
 
-.folder-list-container li.folder-item {
-    font-size: 0.95em;
-    color: #343a40;
-}
-.folder-list-container .folder-content-wrapper {
-    border-bottom: 1px solid #e9ecef;
-}
-.folder-list-container li.folder-item:last-child > .folder-content-wrapper {
-     border-bottom: none;
+.folder-item {
+    margin: 4px 0;
 }
 
-.folder-list-container .folder-content-wrapper {
+.folder-content-wrapper {
     display: flex;
     align-items: center;
-    padding: 8px 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background-color 0.15s ease-in-out;
-}
-.folder-list-container .folder-content-wrapper:hover {
-    background-color: #eef4ff;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    border: 1px solid transparent;
 }
 
-.folder-list-container li.selected > .folder-content-wrapper {
-    background-color: #007bff;
-    color: white;
-    font-weight: 500;
-}
-.folder-list-container li.selected > .folder-content-wrapper .folder-icon-tree,
-.folder-list-container li.selected > .folder-content-wrapper .folder-toggle-icon {
-    color: white;
+.folder-content-wrapper:hover {
+    background-color: var(--secondary-color);
 }
 
+/* Estado visual al seleccionar una carpeta */
+.folder-item.selected > .folder-content-wrapper {
+    background-color: rgba(37, 99, 235, 0.08); /* Azul principal translúcido */
+    border-color: rgba(37, 99, 235, 0.3);
+}
 
-.folder-list-container .folder-toggle-icon {
+.folder-item.selected > .folder-content-wrapper .folder-name {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.folder-toggle-icon {
     width: 20px;
     text-align: center;
-    margin-right: 5px;
-    color: #6c757d;
-    cursor: pointer;
-    transition: transform 0.2s ease-in-out, color 0.15s ease-in-out;
-    flex-shrink: 0;
-}
-.folder-list-container .folder-toggle-icon.no-children {
-    color: transparent;
-    cursor: default;
-}
-.folder-list-container .folder-content-wrapper:hover .folder-toggle-icon:not(.no-children) {
-    color: #0056b3;
-}
-
-.folder-list-container .folder-icon-tree {
+    color: var(--text-muted);
     margin-right: 8px;
-    color: #007bff; 
-    width: 16px;
-    text-align: center;
-    flex-shrink: 0;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: color 0.2s ease;
 }
 
-.folder-list-container .folder-name {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-grow: 1;
+.folder-toggle-icon:hover {
+    color: var(--text-primary);
 }
 
-.folder-list-container .loading-text {
-    padding: 15px;
-    text-align: center;
-    color: #6c757d;
-    font-style: italic;
+.folder-toggle-icon.no-children {
+    visibility: hidden;
 }
 
-@keyframes fadeInBackground {
-    from { background-color: rgba(0, 0, 0, 0); }
-    to { background-color: rgba(0, 0, 0, 0.6); }
+/* Iconos de las carpetas */
+.folder-icon-tree {
+    color: #fbbf24; /* Un tono amarillo/dorado plano moderno */
+    margin-right: 10px;
+    font-size: 1.1em;
 }
 
-@keyframes slideDownModal {
-    from { transform: translateY(-30px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+.fa-hdd.folder-icon-tree {
+    color: var(--text-secondary); /* Gris para el icono del disco raíz */
+}
+
+.folder-name {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    user-select: none;
 }

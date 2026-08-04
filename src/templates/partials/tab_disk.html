@@ -1,0 +1,65 @@
+<div id="tab-disk" class="tab-content">
+    <div class="action-forms-container">
+        <div class="action-card" style="flex: 100%; max-width: 700px; margin: 0 auto;">
+            <h3><i class="fas fa-chart-pie icon"></i> Estado del Almacenamiento</h3>
+            
+            <div id="disk-info-content" style="text-align: center; padding: 30px 0;">
+                <p class="loading-text" style="color: #6c757d;"><i class="fas fa-spinner fa-spin"></i> Analizando disco...</p>
+            </div>
+            
+            <div id="disk-info-data" style="display: none; padding: 10px 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1em; font-weight: 500; color: #495057;">
+                    <span id="disk-used-text"><i class="fas fa-database" style="color: #007bff;"></i> Usado: 0 GB</span>
+                    <span id="disk-free-text"><i class="fas fa-check-circle" style="color: #28a745;"></i> Libre: 0 GB</span>
+                </div>
+                
+                <div class="progress-bar-container" style="height: 30px; margin-bottom: 20px; background-color: #e9ecef; border-radius: 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                    <div id="disk-progress-bar" class="progress-bar-fill" style="width: 0%; line-height: 30px; background-color: #007bff; font-size: 1em; font-weight: bold; color: white; transition: width 0.8s ease-in-out;">0%</div>
+                </div>
+                
+                <div style="text-align: center; color: #6c757d; border-top: 1px solid #e9ecef; padding-top: 15px; margin-bottom: 20px;">
+                    <p style="margin: 0; font-size: 1.05em;"><strong>Capacidad Total:</strong> <span id="disk-total-text">0 GB</span></p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; text-align: left; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6;">
+                    <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;">
+                        <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase; font-weight: bold;"><i class="fas fa-microchip"></i> Dispositivo</div>
+                        <div style="color: #212529; font-weight: 500; margin-top: 8px; font-size: 1.1em;">
+                            <span id="hw-device">-</span> <span id="hw-fs" style="font-size: 0.8em; background: #e9ecef; padding: 3px 6px; border-radius: 4px; margin-left: 5px; color: #495057;">-</span>
+                        </div>
+                        <div style="margin-top: 6px;">
+                            <span id="hw-rw-status" style="font-size: 0.75em; padding: 3px 8px; border-radius: 12px; font-weight: bold;">-</span>
+                        </div>
+                    </div>
+                    <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase; font-weight: bold;"><i class="fas fa-thermometer-half"></i> Salud S.M.A.R.T.</div>
+                        <div style="color: #212529; font-weight: 500; margin-top: 8px; font-size: 1.1em;">
+                            <span id="hw-health">-</span>
+                            <span id="hw-temp" style="margin-left: 10px; font-weight: bold;">-</span>
+                        </div>
+                        <div style="font-size: 0.8em; color: #888; margin-top: 6px; line-height: 1.3;">
+                            Autodiagnóstico del disco. Lo ideal es mantener la temperatura por debajo de los 50°C.
+                        </div>
+                    </div>
+                    <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="color: #6c757d; font-size: 0.85em; text-transform: uppercase; font-weight: bold;"><i class="fas fa-bolt"></i> Energía del Motor</div>
+                        <div style="color: #212529; font-weight: 500; margin-top: 8px; font-size: 1.1em;">
+                            <span id="hw-power">-</span>
+                        </div>
+                        <div style="font-size: 0.8em; color: #888; margin-top: 6px; line-height: 1.3;">
+                            Indica si los platos están girando. A menudo es "Desconocido" por limitaciones de las carcasas USB.
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; text-align: right; border-top: 1px solid #e9ecef; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn btn-outline-warning" onclick="cleanOrphanParts()" id="btn-clean-parts">
+                        <i class="fas fa-broom"></i> Limpiar archivos temporales (.part)
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="safeEjectDisk()" id="btn-eject-disk">
+                        <i class="fas fa-eject"></i> Extraer disco con seguridad
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

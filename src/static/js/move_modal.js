@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 
                 if (typeof moveMultipleItemsApiUrl === 'undefined') {
-                    alert("Error: Move action URL not configured.");
+                    alert('Error: Move action URL not configured.'  );
                     return;
                 }
                 

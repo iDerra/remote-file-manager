@@ -1,0 +1,25 @@
+<div id="tab-services" class="tab-content">
+    <div class="action-forms-container">
+        <div class="action-card">
+            <h3><i class="fas fa-network-wired icon"></i> Share Network (Samba)</h3>
+            <p>Allows you to view files from Windows/Mac computers and Smart TVs.</p>
+            <p>Current Status: <span class="service-status status-online">Online</span></p>
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button class="btn btn-secondary" onclick="alert('En desarrollo')"><i class="fas fa-play"></i> Start</button>
+                <button class="btn btn-secondary" onclick="alert('En desarrollo')"><i class="fas fa-stop"></i> Stop</button>
+                <button class="btn btn-primary" onclick="alert('En desarrollo')"><i class="fas fa-sync-alt"></i> Restart</button>
+            </div>
+        </div>
+        <div class="action-card">
+            <h3><i class="fas fa-tv icon"></i> DLNA Server (Smart TV)</h3>
+            <p>Native multimedia server for automatic movie indexing on televisions.</p>
+            <p>Current Status: <span id="dlna-status-badge" class="service-status" style="background-color: #e9ecef; color: #495057;">Checking...</span></p>
+            <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn btn-secondary" onclick="controlDLNA('start')"><i class="fas fa-play"></i> Start</button>
+                <button class="btn btn-secondary" onclick="controlDLNA('stop')"><i class="fas fa-stop"></i> Stop</button>
+                <button class="btn btn-primary" onclick="controlDLNA('restart')"><i class="fas fa-sync-alt"></i> Restart</button>
+                <button class="btn btn-danger" style="width: 100%; margin-top: 5px;" onclick="controlDLNA('rescan')"><i class="fas fa-search"></i> Force Scan Media</button>
+            </div>
+        </div>
+    </div>
+</div>

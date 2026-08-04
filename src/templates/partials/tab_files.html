@@ -1,0 +1,198 @@
+<div id="tab-files" class="tab-content active">
+    {% if parent_path_url %}
+    <div class="navigation-controls">
+        <a href="{{ parent_path_url }}" class="btn btn-secondary back-button">
+            <i class="fas fa-arrow-left icon"></i>
+        </a>
+    </div>
+    {% endif %}
+    
+    <div class="action-forms-container">
+        <div class="action-card">
+            <h3><i class="fas fa-folder-plus icon"></i> Create New Folder</h3>
+            <form action="{{ url_for('actions.create_folder', parent_folder_segment=current_path_for_forms) }}" method="post" class="styled-form">
+                <div class="form-group">
+                    <label for="new_folder_name_input">Folder name:</label>
+                    <input type="text" id="new_folder_name_input" name="new_folder_name" placeholder="E.g: Important Documents" required>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Folder</button>
+            </form>
+        </div>
+        <div class="action-card">
+            <h3><i class="fas fa-file-upload icon"></i> Upload Files</h3>
+            <form id="upload-files-form" action="{{ url_for('files.upload_files', destination_folder_segment=current_path_for_forms) }}" method="post" enctype="multipart/form-data" class="styled-form">
+                <div class="form-group">
+                    <label for="files-upload-input-files">Select files:</label>
+                    <div class="custom-file-input-wrapper">
+                        <input type="file" id="files-upload-input-files" name="files_to_upload" multiple required>
+                        <label for="files-upload-input-files" class="custom-file-label">
+                            <i class="fas fa-file-import"></i> <span class="file-chosen-text">Choose files...</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Files</button>
+            </form>
+        </div>
+        
+        <div class="action-card">
+            <h3><i class="fas fa-folder-open icon"></i> Upload Folder</h3>
+            <form id="upload-folder-form" action="{{ url_for('files.upload_files', destination_folder_segment=current_path_for_forms) }}" method="post" enctype="multipart/form-data" class="styled-form">
+                <div class="form-group">
+                    <label for="files-upload-input-folder">Select a folder:</label>
+                    <div class="custom-file-input-wrapper">
+                        <input type="file" id="files-upload-input-folder" name="files_to_upload" multiple required webkitdirectory directory>
+                        <label for="files-upload-input-folder" class="custom-file-label">
+                            <i class="fas fa-folder-plus"></i> <span class="file-chosen-text">Choose folder...</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Folder</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="upload-progress-container" class="bulk-actions-container" style="display: none;">
+        <h4>Upload Progress</h4>
+        <div id="upload-progress-area"> 
+            <p id="file-count-text" style="margin-top:0; margin-bottom: 5px;"></p>
+            <div class="progress-bar-container">
+                <div id="progress-bar" class="progress-bar-fill">0%</div>
+            </div>
+            <p id="upload-status-text" style="margin-top: 5px; margin-bottom: 10px;"></p>
+            <ul id="individual-file-status" style="list-style-type: none; padding-left: 0; max-height: 150px; overflow-y: auto; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; padding:10px;"></ul>
+        </div>
+    </div>
+    
+    <div id="bulk-actions-container" class="bulk-actions-container" style="display:none; margin-bottom: 20px;">
+        <h4>Actions for selected:</h4>
+        <div class="bulk-actions-buttons-container">
+            <button id="download-selected-zip-btn" class="btn btn-primary" data-download-zip-url="{{ url_for('files.prepare_multiple_files_zip') }}">
+                <i class="fas fa-file-archive"></i> Download Selected as ZIP
+            </button>
+            <button id="move-selected-btn" class="btn btn-primary" style="margin-right: 10px;">
+                <i class="fas fa-share-square"></i> Move Selected
+            </button>
+            <button id="delete-selected-btn" class="btn btn-danger" data-delete-url="{{ url_for('actions.delete_multiple_items') }}">
+                <i class="fas fa-trash-alt"></i> Delete Selected
+            </button>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 5%; text-align: center;"><input type="checkbox" id="select-all-checkbox" title="Select all/none"></th>
+                <th style="width: 35%;">Name</th>
+                <th style="width: 10%;">Size</th>
+                <th style="width: 15%;">Modified</th>
+                <th style="width: 35%;" class="actions-cell">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td style="text-align: center;">
+                    <input type="checkbox" class="item-checkbox" name="selected_items" value="{{ item.id_path }}" data-name="{{ item.name|e }}">
+                </td>
+                <td>
+                    {% if item.is_dir %}
+                        <i class="fas fa-folder icon" style="color: #FFD700;"></i>
+                        <a href="{{ item.url }}">{{ item.name }}</a>
+                    {% else %}
+                        {% if item.is_video %}
+                            <i class="fas fa-file-video icon" style="color: #9b59b6;"></i>
+                            <a href="javascript:void(0);" onclick="toggleVideoDetails('{{ loop.index }}', '{{ item.id_path }}', '{{ item.stream_url }}')">{{ item.name }}</a>
+                        {% else %}
+                            <i class="fas fa-file icon" style="color: #6c757d;"></i>
+                            {{ item.name }}
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.is_dir %}
+                        <button class="btn" onclick="calculateFolderSize('{{ item.id_path }}', this)" title="Calculate real size" style="padding: 2px 8px; font-size: 0.8em; background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; color: #495057;">
+                            <i class="fas fa-search"></i> Calculate
+                        </button>
+                    {% else %}
+                        {% if item.size is not none %}
+                            {% if item.size < 1024 %}
+                                <span class="size">{{ item.size }} B</span>
+                            {% elif item.size < 1024*1024 %}
+                                <span class="size">{{ '%.2f' | format(item.size / 1024) }} KB</span>
+                            {% elif item.size < 1024*1024*1024 %}
+                                <span class="size">{{ '%.2f' | format(item.size / (1024*1024)) }} MB</span>
+                            {% else %}
+                                <span class="size">{{ '%.2f' | format(item.size / (1024*1024*1024)) }} GB</span>
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td><span class="modified">{{ item.modified }}</span></td>
+                <td class="actions-cell">
+                    <a href="{{ item.download_url }}" title="Download {{ item.name|e }}">
+                        <i class="fas {{ 'fa-file-archive' if item.is_dir else 'fa-download' }} icon" style="color: {{ '#e67e22' if item.is_dir else '#2ecc71' }};"></i>
+                    </a>
+                    <form action="{{ url_for('actions.delete_item', item_to_delete_segment=item.id_path) }}" method="post" onsubmit="return confirm('Are you sure you want to delete \'{{ item.name|e }}\'? \n\nTHIS ACTION IS IRREVERSIBLE.');"
+                        style="display: inline-block;">
+                        <button type="submit" title="Delete {{ item.name|e }}">
+                            <i class="fas fa-trash-alt icon" style="color: #dc3545;"></i>
+                        </button>
+                    </form>
+                    <button class="open-move-modal-btn" data-item-path="{{ item.id_path }}" data-item-name="{{ item.name|e }}" title="Move {{ item.name|e }}" style="background: none; border: none; padding: 3px 5px; cursor: pointer; font-size: 1em;">
+                        <i class="fas fa-share-square icon" style="color: #007bff;"></i>
+                    </button>
+                </td>
+            </tr>
+            {% if item.is_video %}
+            <tr id="video-details-{{ loop.index }}" class="video-details-row" style="display: none;">
+                <td colspan="5">
+                    <div class="video-details-container">
+                        <div class="video-thumbnail" onclick="openVideoPlayer('{{ item.stream_url }}', '{{ item.id_path }}', '{{ item.name|e }}')">
+                            <canvas id="video-canvas-{{ loop.index }}" width="320" height="180"></canvas>
+                            <i class="fas fa-play-circle play-overlay"></i>
+                        </div>
+                        <div class="video-info">
+                            <h4>{{ item.name }}</h4>
+                            <p><i class="fas fa-clock"></i> <strong>Duration:</strong> <span id="video-duration-{{ loop.index }}">Loading...</span></p>
+                            <p><i class="fas fa-eye"></i> <strong>Status:</strong> <span id="video-status-{{ loop.index }}">Not viewed</span></p>
+                            <p><i class="fas fa-step-forward"></i> <strong>Progress Saved:</strong> <span id="video-progress-{{ loop.index }}">00:00</span></p>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px; color: #888;">
+                    The directory is empty.
+                    <br><small>You can create a folder or upload files using the forms above.</small>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if total_pages > 1 %}
+    <div class="pagination-container" style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; margin-bottom: 10px;">
+        {% if page > 1 %}
+            <a href="{{ url_for('browse.browse_directory', subpath=raw_subpath, page=page-1) }}" class="btn btn-secondary">
+                <i class="fas fa-chevron-left"></i> Previous
+            </a>
+        {% else %}
+            <button class="btn btn-secondary" disabled><i class="fas fa-chevron-left"></i> Previous</button>
+        {% endif %}
+        
+        <span style="font-weight: 500; color: #495057;">
+            Page {{ page }} of {{ total_pages }} (Total: {{ total_items }} files and folders)
+        </span>
+        
+        {% if page < total_pages %}
+            <a href="{{ url_for('browse.browse_directory', subpath=raw_subpath, page=page+1) }}" class="btn btn-secondary">
+                Next <i class="fas fa-chevron-right"></i>
+            </a>
+        {% else %}
+            <button class="btn btn-secondary" disabled>Next <i class="fas fa-chevron-right"></i></button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,598 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            button.classList.add('active');
+            const targetTab = document.getElementById(button.getAttribute('data-tab'));
+            if (targetTab) targetTab.classList.add('active');
+        });
+    });
+    function setupFileInputFeedback(inputId, isFolderInput) {
+        const fileInput = document.getElementById(inputId);
+        const wrapper = fileInput ? fileInput.closest('.custom-file-input-wrapper') : null;
+        if (!wrapper) return;
+        const fileChosenTextSpan = wrapper.querySelector('.custom-file-label .file-chosen-text');
+        if (fileInput && fileChosenTextSpan) {
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    if (isFolderInput) {
+                        let firstFile = this.files[0];
+                        let directoryName = firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/')[0] : "Carpeta";
+                        fileChosenTextSpan.textContent = `Carpeta: ${directoryName} (${this.files.length} archivos)`;
+                    } else {
+                        fileChosenTextSpan.textContent = this.files.length > 1 ? `${this.files.length} archivos seleccionados` : this.files[0].name;
+                    }
+                } else {
+                    fileChosenTextSpan.textContent = isFolderInput ? 'Elige una carpeta...' : 'Elige archivos...';
+                }
+            });
+        }
+    }
+    setupFileInputFeedback('files-upload-input-files', false);
+    setupFileInputFeedback('files-upload-input-folder', true);
+    setupFileInputFeedback('torrent_file', false);
+});
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const addTorrentForm = document.getElementById('add-torrent-form');
+        const feedbackDiv = document.getElementById('torrent-feedback');
+        if (addTorrentForm) {
+            addTorrentForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                feedbackDiv.innerHTML = '<span style="color: blue;">Sending to Transmission...</span>';
+                const formData = new FormData(addTorrentForm);
+                fetch('/api/torrents/add', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        feedbackDiv.innerHTML = `<span style="color: green;">${data.message}</span>`;
+                        addTorrentForm.reset();
+                        document.querySelector('#torrent_file + label .file-chosen-text').textContent = "Select...";
+                        document.getElementById('download_path').value = '__root__';
+                        document.getElementById('selected-path-display').textContent = 'Root Directory (/)';
+                        updateTorrentList();
+                    } else {
+                        feedbackDiv.innerHTML = `<span style="color: red;">${data.message}</span>`;
+                    }
+                })
+                .catch(err => {
+                    feedbackDiv.innerHTML = `<span style="color: red;">Network error.</span>`;
+                });
+            });
+        }
+        function updateTorrentList() {
+            if(!document.getElementById('tab-torrents').classList.contains('active')) return;
+            fetch('/api/torrents/list')
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.getElementById('torrent-list-body');
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: red;">Error: ${data.message}</td></tr>`;
+                    return;
+                }
+                if (data.torrents.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888;">No active downloads at the moment.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = '';
+                data.torrents.forEach(t => {
+                    let statusColor = '#6c757d';
+                    if(t.status === 'downloading') statusColor = '#007bff';
+                    else if(t.status === 'seeding') statusColor = '#28a745';
+                    else if(t.status === 'stopped') statusColor = '#dc3545';
+                    let errorHtml = t.errorString ? `<div style="color: red; font-size: 0.8em; margin-top: 4px;"><i class="fas fa-exclamation-triangle"></i> ${t.errorString}</div>` : '';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>
+                                <strong>${t.name}</strong>
+                                ${errorHtml}
+                            </td>
+                            <td>
+                                <div class="progress-bar-container" style="height: 15px;">
+                                    <div class="progress-bar-fill" style="width: ${t.progress}%; line-height: 15px; font-size: 0.7em;">${t.progress}%</div>
+                                </div>
+                            </td>
+                            <td>${t.downloadRate > 0 ? t.downloadRate + ' KB/s' : '-'}</td>
+                            <td><span style="color: ${statusColor}; font-weight: 500;">${t.status}</span></td>
+                            <td style="text-align: center;">
+                                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.9em;" onclick="removeTorrent(${t.id})" title="Delete torrent and downloaded data">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+        }
+        window.removeTorrent = function(id) {
+            if (confirm('Are you sure you want to delete this torrent and its downloaded data?')) {
+                fetch('/api/torrents/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) { updateTorrentList(); } 
+                    else { alert('Error deleting torrent: ' + data.message, 'error'); }
+                })
+                .catch(err => {
+                    alert('Network error while trying to delete the torrent.', 'error');
+                });
+            }
+        };
+        setInterval(updateTorrentList, 3000);
+        document.querySelector('[data-tab="tab-torrents"]').addEventListener('click', updateTorrentList);
+    });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const openFolderBtn = document.getElementById('open-torrent-folder-btn');
+        const hiddenDownloadPathInput = document.getElementById('download_path');
+        const selectedPathDisplay = document.getElementById('selected-path-display');
+        const folderModal = document.getElementById('torrent-folder-modal');
+        const folderListContainer = document.getElementById('torrent-folder-list-container');
+        const confirmFolderBtn = document.getElementById('confirm-torrent-folder-btn');
+        
+        let selectedTorrentPath = null;
+        let displayFolderName = null;
+        function openTorrentModal() {
+            folderModal.style.display = 'block';
+            selectedTorrentPath = null;
+            displayFolderName = null;
+            confirmFolderBtn.disabled = true;
+            folderListContainer.innerHTML = '<p class="loading-text">Loading folders from Raspberry...</p>';
+            
+            fetch(listFoldersTreeApiUrl)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    folderListContainer.innerHTML = `<p class="loading-text" style="color: red;">Error: ${data.error}</p>`;
+                    return;
+                }
+                folderListContainer.innerHTML = '';
+                const ul = document.createElement('ul');
+                ul.classList.add('top-level-folder-list');
+                const rootFolder = { name: 'Root Directory (/)', path: '__root__', children: data };
+                ul.appendChild(createSelectableFolderItem(rootFolder, true));
+                folderListContainer.appendChild(ul);
+            })
+            .catch(err => {
+                folderListContainer.innerHTML = `<p class="loading-text" style="color: red;">Network error while loading folders.</p>`;
+            });
+        }
+        function closeTorrentModal() { folderModal.style.display = 'none'; }
+        
+        if (openFolderBtn) openFolderBtn.addEventListener('click', openTorrentModal);
+        document.getElementById('close-torrent-folder-btn').addEventListener('click', closeTorrentModal);
+        document.getElementById('cancel-torrent-folder-btn').addEventListener('click', closeTorrentModal);
+        confirmFolderBtn.addEventListener('click', () => {
+            if (selectedTorrentPath !== null) {
+                hiddenDownloadPathInput.value = selectedTorrentPath; 
+                selectedPathDisplay.textContent = displayFolderName;
+                closeTorrentModal();
+            }
+        });
+        function createSelectableFolderItem(folderData, isRoot = false) {
+            const li = document.createElement('li');
+            li.classList.add('folder-item');
+            
+            const contentWrapper = document.createElement('div');
+            contentWrapper.classList.add('folder-content-wrapper');
+            
+            const toggleIcon = document.createElement('i');
+            toggleIcon.classList.add('fas', 'folder-toggle-icon');
+            if (folderData.children && folderData.children.length > 0) { toggleIcon.classList.add('fa-caret-right'); } 
+            else { toggleIcon.classList.add('no-children'); }
+            
+            const icon = document.createElement('i');
+            icon.classList.add('fas', isRoot ? 'fa-hdd' : 'fa-folder', 'folder-icon-tree');
+            
+            const span = document.createElement('span');
+            span.classList.add('folder-name');
+            span.textContent = folderData.name;
+            
+            contentWrapper.appendChild(toggleIcon);
+            contentWrapper.appendChild(icon);
+            contentWrapper.appendChild(span);
+            li.appendChild(contentWrapper);
+            
+            contentWrapper.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('#torrent-folder-list-container li').forEach(el => el.classList.remove('selected'));
+                li.classList.add('selected');
+                selectedTorrentPath = folderData.path;
+                displayFolderName = folderData.name;
+                confirmFolderBtn.disabled = false;
+            });
+            
+            if (folderData.children && folderData.children.length > 0) {
+                const subList = document.createElement('ul');
+                subList.classList.add('subfolder-list');
+                subList.style.display = 'none';
+                folderData.children.forEach(child => subList.appendChild(createSelectableFolderItem(child)));
+                li.appendChild(subList);
+                
+                toggleIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isExpanded = subList.style.display === 'block';
+                    subList.style.display = isExpanded ? 'none' : 'block';
+                    toggleIcon.classList.toggle('fa-caret-right', isExpanded);
+                    toggleIcon.classList.toggle('fa-caret-down', !isExpanded);
+                });
+            }
+            return li;
+        }
+    });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        window.controlDLNA = function(action) {
+            const badge = document.getElementById('dlna-status-badge');
+            badge.textContent = 'Processing...';
+            badge.style.backgroundColor = '#fff3cd';
+            badge.style.color = '#856404';
+            fetch(`/api/services/minidlna/${action}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) { checkDLNAStatus(); } 
+                else { alert('Error: ' + data.message); checkDLNAStatus(); }
+            })
+            .catch(err => { alert('Error de conexión.'); checkDLNAStatus(); });
+        };
+        window.checkDLNAStatus = function() {
+            if(!document.getElementById('tab-services').classList.contains('active')) return;
+            fetch('/api/services/minidlna/status', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.getElementById('dlna-status-badge');
+                if (data.success && data.active) {
+                    badge.textContent = 'Online';
+                    badge.style.backgroundColor = '#d1e7dd';
+                    badge.style.color = '#0f5132';
+                } else {
+                    badge.textContent = 'Stopped';
+                    badge.style.backgroundColor = '#f8d7da';
+                    badge.style.color = '#842029';
+                }
+            });
+        };
+        document.querySelector('[data-tab="tab-services"]').addEventListener('click', checkDLNAStatus);
+        setTimeout(checkDLNAStatus, 500); 
+    });
+</script>
+
+<script>
+    window.calculateFolderSize = function(path, btnElement) {
+        const originalHtml = btnElement.innerHTML;
+        btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating...';
+        btnElement.disabled = true;
+        fetch('/api/item-info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: path })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let bytes = data.size;
+                let sizeStr = bytes + ' B';
+                if (bytes >= 1073741824) sizeStr = (bytes / 1073741824).toFixed(2) + ' GB';
+                else if (bytes >= 1048576) sizeStr = (bytes / 1048576).toFixed(2) + ' MB';
+                else if (bytes >= 1024) sizeStr = (bytes / 1024).toFixed(2) + ' KB';
+                const td = btnElement.parentElement;
+                td.innerHTML = `<span class="size" style="font-weight:bold; color: #212529;">${sizeStr}</span><br><small style="color:#6c757d;">${data.file_count} files</small>`;
+            } else {
+                btnElement.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:red;"></i> Error';
+                btnElement.disabled = false;
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(err => {
+            btnElement.innerHTML = originalHtml;
+            btnElement.disabled = false;
+            alert('Error de red al intentar calcular el tamaño.');
+        });
+    };
+</script>
+
+<script>
+    function getVideoData(idPath) {
+        const data = localStorage.getItem('video_data_' + idPath);
+        return data ? JSON.parse(data) : { currentTime: 0, watched: false, duration: 0 };
+    }
+    function saveVideoData(idPath, data) {
+        localStorage.setItem('video_data_' + idPath, JSON.stringify(data));
+    }
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return "00:00";
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    function toggleVideoDetails(index, idPath, streamUrl) {
+        const detailsRow = document.getElementById('video-details-' + index);
+        
+        if (detailsRow.style.display === 'none') {
+            detailsRow.style.display = 'table-row';
+            
+            const data = getVideoData(idPath);
+            const statusHtml = data.watched ? '<span style="color:#28a745; font-weight:bold;"><i class="fas fa-check-double"></i> Visto</span>' : 'No visto';
+            document.getElementById('video-status-' + index).innerHTML = statusHtml;
+            document.getElementById('video-progress-' + index).innerText = formatTime(data.currentTime);
+            if (data.duration > 0) {
+                document.getElementById('video-duration-' + index).innerText = formatTime(data.duration);
+            }
+            const canvas = document.getElementById('video-canvas-' + index);
+            if (canvas.getAttribute('data-loaded') === 'true') return; 
+            const video = document.createElement('video');
+            video.src = streamUrl;
+            video.crossOrigin = 'anonymous';
+            video.preload = 'metadata';
+            video.muted = true;
+            
+            video.addEventListener('loadedmetadata', function() {
+                if (!data.duration) {
+                    data.duration = video.duration;
+                    saveVideoData(idPath, data);
+                    document.getElementById('video-duration-' + index).innerText = formatTime(video.duration);
+                }
+                let targetTime = data.currentTime;
+                if (targetTime <= 0 || targetTime >= video.duration - 2) {
+                    targetTime = Math.min(60, video.duration / 2);
+                }
+                video.currentTime = targetTime;
+            });
+            video.addEventListener('seeked', function() {
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.setAttribute('data-loaded', 'true');
+                video.removeAttribute('src'); 
+                video.load();
+            });
+        } else {
+            detailsRow.style.display = 'none';
+        }
+    }
+    
+    let currentPlayingVideoPath = null;
+    let currentPlayingIndex = null; 
+    function openVideoPlayer(streamUrl, idPath, title) {
+        const modal = document.getElementById('video-player-modal');
+        const player = document.getElementById('main-video-player');
+        const titleSpan = document.getElementById('video-modal-title');
+        
+        currentPlayingVideoPath = idPath;
+        document.querySelectorAll('.video-details-row').forEach(row => {
+            if (row.innerHTML.includes(idPath)) {
+                currentPlayingIndex = row.id.replace('video-details-', '');
+            }
+        });
+        titleSpan.innerText = title;
+        
+        player.innerHTML = 'Your browser does not support the HTML5 video element.';
+        player.src = streamUrl;
+        
+        fetch(`/api/video_subtitles/${idPath}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.subtitles.length > 0) {
+                    data.subtitles.forEach((sub) => {
+                        const track = document.createElement('track');
+                        track.kind = 'subtitles';
+                        track.label = sub.label;
+                        track.srclang = sub.language;
+                        track.src = `/stream_subtitle/${idPath}/${sub.index}`;
+                        player.appendChild(track);
+                    });
+                }
+            })
+            .catch(err => console.error("Error cargando subtítulos:", err));
+            
+        const data = getVideoData(idPath);
+        if (data.currentTime > 0 && !data.watched) {
+            player.currentTime = data.currentTime;
+        }
+        modal.style.display = 'block';
+        player.play();
+    }
+    
+    const mainPlayer = document.getElementById('main-video-player');
+    mainPlayer.addEventListener('timeupdate', function(e) {
+        if (!currentPlayingVideoPath) return;
+        const player = e.target;
+        if (player.duration) {
+            const watched = (player.currentTime / player.duration) > 0.90;
+            const data = {
+                currentTime: player.currentTime,
+                duration: player.duration,
+                watched: watched
+            };
+            if (Math.floor(player.currentTime) % 2 === 0) { 
+                saveVideoData(currentPlayingVideoPath, data);
+            }
+        }
+    });
+    
+    function closeVideoPlayer() {
+        const modal = document.getElementById('video-player-modal');
+        
+        if (currentPlayingVideoPath) {
+            const data = {
+                currentTime: mainPlayer.currentTime,
+                duration: mainPlayer.duration,
+                watched: (mainPlayer.currentTime / mainPlayer.duration) > 0.90
+            };
+            saveVideoData(currentPlayingVideoPath, data);
+            if (currentPlayingIndex) {
+                const statusHtml = data.watched ? '<span style="color:#28a745; font-weight:bold;"><i class="fas fa-check-double"></i> Visto</span>' : 'No visto';
+                const statusEl = document.getElementById('video-status-' + currentPlayingIndex);
+                const progressEl = document.getElementById('video-progress-' + currentPlayingIndex);
+                
+                if (statusEl) statusEl.innerHTML = statusHtml;
+                if (progressEl) progressEl.innerText = formatTime(data.currentTime);
+            }
+        }
+        mainPlayer.pause();
+        mainPlayer.removeAttribute('src'); 
+        mainPlayer.load();
+        modal.style.display = 'none';
+        currentPlayingVideoPath = null;
+        currentPlayingIndex = null;
+    }
+    
+    document.getElementById('close-video-player-btn').addEventListener('click', closeVideoPlayer);
+    window.addEventListener('click', function(event) {
+        const modal = document.getElementById('video-player-modal');
+        if (event.target === modal) {
+            closeVideoPlayer();
+        }
+    });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const diskTabBtn = document.querySelector('[data-tab="tab-disk"]');
+        let diskDataLoaded = false;
+        
+        function formatBytesToGB(bytes) {
+            return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        }
+        function loadDiskInfo() {
+            if (diskDataLoaded) return;
+            fetch('/api/disk-info')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('disk-info-content').style.display = 'none';
+                    document.getElementById('disk-info-data').style.display = 'block';
+                    
+                    document.getElementById('disk-total-text').textContent = formatBytesToGB(data.total);
+                    document.getElementById('disk-used-text').innerHTML = `<i class="fas fa-database" style="color: #007bff;"></i> Usado: ${formatBytesToGB(data.used)}`;
+                    document.getElementById('disk-free-text').innerHTML = `<i class="fas fa-check-circle" style="color: #28a745;"></i> Libre: ${formatBytesToGB(data.free)}`;
+                    
+                    const progressBar = document.getElementById('disk-progress-bar');
+                    progressBar.style.width = data.percent + '%';
+                    progressBar.textContent = data.percent + '%';
+                    
+                    if (data.percent >= 90) { progressBar.style.backgroundColor = '#dc3545'; } 
+                    else if (data.percent >= 75) { progressBar.style.backgroundColor = '#ffc107'; progressBar.style.color = '#343a40'; } 
+                    else { progressBar.style.backgroundColor = '#007bff'; }
+                    
+                    document.getElementById('hw-device').textContent = data.device;
+                    document.getElementById('hw-fs').textContent = data.fs_type;
+                    document.getElementById('hw-power').textContent = data.power_status;
+                    
+                    const rwBadge = document.getElementById('hw-rw-status');
+                    if (data.is_writable) {
+                        rwBadge.textContent = 'Lectura / Escritura';
+                        rwBadge.style.backgroundColor = '#d4edda';
+                        rwBadge.style.color = '#155724';
+                    } else {
+                        rwBadge.innerHTML = '<i class="fas fa-lock"></i> Solo Lectura (Bloqueado)';
+                        rwBadge.style.backgroundColor = '#f8d7da';
+                        rwBadge.style.color = '#721c24';
+                    }
+                    
+                    const healthSpan = document.getElementById('hw-health');
+                    healthSpan.textContent = data.health;
+                    if (data.health === "Correcto") {
+                        healthSpan.innerHTML = `<i class="fas fa-check" style="color: #28a745;"></i> Correcto`;
+                        healthSpan.style.color = '#28a745';
+                    } else if (data.health === "Riesgo de fallo") {
+                        healthSpan.innerHTML = `<i class="fas fa-times" style="color: #dc3545;"></i> Riesgo`;
+                        healthSpan.style.color = '#dc3545';
+                    }
+                    
+                    const tempSpan = document.getElementById('hw-temp');
+                    tempSpan.textContent = data.temperature;
+                    const tempValue = parseInt(data.temperature);
+                    if (!isNaN(tempValue)) {
+                        if (tempValue < 40) { tempSpan.style.color = '#28a745'; } 
+                        else if (tempValue >= 40 && tempValue < 50) { tempSpan.style.color = '#fd7e14'; } 
+                        else { tempSpan.style.color = '#dc3545'; }
+                    } else {
+                        tempSpan.style.color = '#6c757d'; 
+                    }
+                    
+                    diskDataLoaded = true;
+                } else {
+                    document.getElementById('disk-info-content').innerHTML = `<p style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-triangle"></i> Error: ${data.message}</p>`;
+                }
+            })
+            .catch(err => {
+                document.getElementById('disk-info-content').innerHTML = `<p style="color: #dc3545; font-weight: bold;"><i class="fas fa-exclamation-triangle"></i> Error de red al consultar el disco.</p>`;
+            });
+        }
+        if (diskTabBtn) {
+            diskTabBtn.addEventListener('click', loadDiskInfo);
+        }
+    });
+
+    function safeEjectDisk() {
+        if(confirm('¿Estás seguro de que quieres expulsar el disco? La web dejará de ver los archivos hasta que lo vuelvas a conectar físicamente.')) {
+            const btn = document.getElementById('btn-eject-disk');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Desmontando...';
+            btn.disabled = true;
+            fetch('/api/unmount-disk', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    alert(data.message);
+                    btn.innerHTML = '<i class="fas fa-check"></i> Expulsado';
+                    btn.classList.replace('btn-outline-danger', 'btn-success');
+                } else {
+                    alert(data.message);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                alert("Error de red al intentar expulsar el disco.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+    }
+
+    function cleanOrphanParts() {
+        if(confirm('¿Seguro que quieres buscar y eliminar descargas web interrumpidas (.part)? Esto despertará el disco para analizarlo.')) {
+            const btn = document.getElementById('btn-clean-parts');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Limpiando...';
+            btn.disabled = true;
+
+            fetch('/api/cleanup_orphan_parts', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                if(data.success) {
+                    diskDataLoaded = false;
+                    const diskTabBtn = document.querySelector('[data-tab="tab-disk"]');
+                    if (diskTabBtn) diskTabBtn.click();
+                }
+            })
+            .catch(err => {
+                alert("Error de red al intentar limpiar archivos.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+    }
+</script>

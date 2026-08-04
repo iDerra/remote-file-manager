@@ -1,0 +1,51 @@
+<div id="move-item-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4>Move Item: <span id="modal-item-name-display"></span></h4>
+            <span class="modal-close-btn" title="Close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Select destination folder:</p>
+            <div id="modal-folder-list-container" class="folder-list-container">
+                <p class="loading-text">Loading folders...</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="modal-move-cancel-btn" class="btn btn-secondary">Cancel</button>
+            <button id="modal-move-confirm-btn" class="btn btn-primary">Move Here</button>
+        </div>
+    </div>
+</div>
+
+<div id="torrent-folder-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4>Select Destination</h4>
+            <span class="modal-close-btn" id="close-torrent-folder-btn" title="Close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Choose the folder where the torrent will be downloaded:</p>
+            <div id="torrent-folder-list-container" class="folder-list-container">
+                <p class="loading-text">Loading folders...</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="cancel-torrent-folder-btn" class="btn btn-secondary">Cancel</button>
+            <button type="button" id="confirm-torrent-folder-btn" class="btn btn-primary" disabled>Accept</button>
+        </div>
+    </div>
+</div>
+
+<div id="video-player-modal" class="modal" style="display: none; z-index: 9999;">
+    <div class="modal-content" style="max-width: 900px; width: 95%; background-color: #1a1a1a; border: 1px solid #333;">
+        <div class="modal-header" style="background-color: #111; border-bottom: 1px solid #333; color: white;">
+            <h4><i class="fas fa-film"></i> <span id="video-modal-title" style="margin-left: 10px;"></span></h4>
+            <span class="modal-close-btn" id="close-video-player-btn" title="Close" style="color: white;">&times;</span>
+        </div>
+        <div class="modal-body" style="padding: 0; background: #000; text-align: center; display: flex; align-items: center; justify-content: center;">
+            <video id="main-video-player" controls crossorigin="anonymous" preload="metadata" style="width: 100%; max-height: 75vh; outline: none; background: #000;">
+                Your browser does not support the HTML5 video element.
+            </video>
+        </div>
+    </div>
+</div>

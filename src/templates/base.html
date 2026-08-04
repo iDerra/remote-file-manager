@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}File Manager{% endblock %}</title>
+    
+    <!-- Fuentes y Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+    <!-- Hojas de estilo -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles-modal.css') }}">
+</head>
+<body>
+    
+    <!-- Aquí se inyectará el Header -->
+    {% block header %}{% endblock %}
+
+    <!-- Contenedor principal para los mensajes Flash y el contenido -->
+    <main class="main-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages-container">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Aquí se inyectará el contenido principal (Las pestañas) -->
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Modales Globales -->
+    {% block modals %}{% endblock %}
+
+    <!-- Scripts Globales -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>
