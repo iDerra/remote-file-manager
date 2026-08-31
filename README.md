@@ -58,10 +58,13 @@ A web-based file manager built with Flask that allows users to browse, upload an
     * Create a `.env` file in the root directory of the project.
     * Add the following variables:
         ```env
+        ADMIN_USERNAME=your_admin_user
+        ADMIN_PASSWORD=your_secure_password
         FILE_SYSTEM_ROOT=/path/to/your/manageable/folder
         SECRET_KEY=your_very_secret_random_key_here
         # FLASK_DEBUG=True    (Optional, for development)
         ```
+        * ⚠️ **Security Requirement:** `ADMIN_USERNAME` and `ADMIN_PASSWORD` are **mandatory**. The application will intentionally fail to start if these are empty to prevent unauthorized access.
         * Replace `/path/to/your/manageable/folder` with the absolute path to the directory you want this application to manage. **Important:** This directory will be fully accessible (read, write, delete) through the web interface.
         * Replace `your_very_secret_random_key_here` with a strong, random secret key.
 

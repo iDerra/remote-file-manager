@@ -8,13 +8,15 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        # Validación con las variables de entorno
-        if username == current_app.config['ADMIN_USERNAME'] and password == current_app.config['ADMIN_PASSWORD']:
+        admin_user = current_app.config.get('ADMIN_USERNAME')
+        admin_pass = current_app.config.get('ADMIN_PASSWORD')
+        
+        if username and password and username == admin_user and password == admin_pass:
             session['logged_in'] = True
             return redirect(url_for('browse.browse_directory'))
         else:
             flash("Usuario o contraseña incorrectos.", "danger")
-    
+
     return render_template('login.html')
 
 @auth_bp.route('/logout')

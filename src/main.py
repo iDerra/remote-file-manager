@@ -1,4 +1,5 @@
 import os
+import sys
 from flask import Flask, request, redirect, url_for, session
 import mimetypes
 import config
@@ -13,8 +14,13 @@ from routes.auth import auth_bp  # Importamos el nuevo blueprint
 # --- Configuration ---
 app = Flask(__name__)
 app.config.from_object(config)
-
 mimetypes.init()
+
+if not app.config.get('ADMIN_USERNAME') or not app.config.get('ADMIN_PASSWORD'):
+        print("CRITICAL ERROR: Administrator credentials are not set.")
+        print("Please set ADMIN_USERNAME and ADMIN_PASSWORD environment variables (e.g., in your .env file).")
+        print("The application will not start to prevent unauthenticated access (CWE-798).")
+        sys.exit(1)
 
 app.register_blueprint(auth_bp)  # Registramos el blueprint
 app.register_blueprint(browse_bp)
