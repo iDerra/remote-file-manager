@@ -5,14 +5,20 @@ A web-based file manager built with Flask that allows users to browse, upload an
 ## Features
 
 * **Browse Files and Folders:** Navigate through the directory structure.
+* **Media & Streaming:**
+    * Built-in video player with subtitle support.
+    * DLNA Server management (start, stop, restart, force scan) for Smart TVs.
+* **Download Management:**
+    * Manage BitTorrent downloads directly from the web interface.
+    * Add torrents via Magnet link or .torrent file.
+* **System Information:**
+    * View disk usage, S.M.A.R.T. health, temperature, and power status.
+    * Safe disk ejection.
 * **File & Folder Operations:**
     * Create new folders.
-    * Upload individual files.
-    * Upload entire folders (preserving structure).
-    * Download individual files.
-    * Download entire folders as a ZIP archive.
-    * Move selected files/folders to a different location within the managed directory.
-    * Delete selected files/folders.
+    * Upload individual files and entire folders.
+    * Download individual files or folders as ZIP archives.
+    * Move and delete files/folders.
 * **Bulk Actions:**
     * Select multiple items (files/folders).
     * Download selected items as a single ZIP archive with an auto-generated name.
@@ -49,7 +55,7 @@ A web-based file manager built with Flask that allows users to browse, upload an
     ```
 
 3.  **Install dependencies:**
-    The project uses Flask and python-dotenv.
+    The project uses Flask, python-dotenv, and requires transmission-rpc for torrents.
     ```bash
     pip3 install -r requirements.txt
     ```
@@ -92,11 +98,14 @@ A web-based file manager built with Flask that allows users to browse, upload an
     * **Download:** Click the download icon (or ZIP icon for folders).
     * **Delete:** Click the trash icon (a confirmation will be asked).
     * **Move:** Click the "Move" icon/button. A modal will appear allowing you to select the destination folder from a tree view.
+    * **Play Video:** Click on a video file to open the built-in player.
 * **Bulk Actions (after selecting items using checkboxes):**
     * **Select/Deselect All:** Use the checkbox in the table header.
     * **Download Selected as ZIP:** Generates a ZIP file of all selected items (preserving folder structure) with an auto-generated name.
     * **Move Selected:** Opens the move modal to select a common destination for all selected items.
     * **Delete Selected:** Deletes all selected items (a confirmation will be asked).
+* **Services & Torrents:** Use the respective tabs to manage the DLNA server and add/monitor torrent downloads.
+* **Disk Info:** Check the 'Info del Disco' tab for storage usage and drive health.
 
 ## Key Technologies
 
@@ -106,14 +115,10 @@ A web-based file manager built with Flask that allows users to browse, upload an
 
 ## To-Do / Potential Improvements
 
-* User authentication and authorization.
-* More robust error handling and logging for edge cases.
 * Option to rename files/folders.
 * Option to view/edit text files.
 * Image previews.
 * Search functionality.
-* More advanced responsive design for very small screens (e.g., collapsing action forms).
-
 
 ## License
 
